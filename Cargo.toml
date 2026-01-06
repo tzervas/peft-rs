@@ -1,0 +1,33 @@
+[package]
+name = "peft-rs"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Comprehensive PEFT (Parameter-Efficient Fine-Tuning) adapter library for Rust"
+repository = "https://github.com/youruser/peft-rs"
+keywords = ["peft", "lora", "machine-learning", "fine-tuning", "llm"]
+categories = ["science", "machine-learning"]
+
+[dependencies]
+candle-core.workspace = true
+candle-nn.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+criterion.workspace = true
+proptest.workspace = true
+anyhow.workspace = true
+
+[features]
+default = []
+cuda = ["candle-core/cuda"]
+
+[lints]
+workspace = true
+
+[[bench]]
+name = "adapters"
+harness = false
