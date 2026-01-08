@@ -2,14 +2,19 @@
 
 This document analyzes the gaps between the Rust `peft-rs` implementation and the official HuggingFace Python PEFT library.
 
+> **See also:** [TASK_TRACKER.md](TASK_TRACKER.md) for implementation status and roadmap.
+
 ## Current State of peft-rs
 
 ### Implemented Adapters
 | Adapter | Status | Notes |
 |---------|--------|-------|
-| LoRA | ✅ Basic | Core functionality implemented |
-| Prefix Tuning | ✅ Basic | Core functionality implemented |
-| Prompt Tuning | ✅ Basic | Core functionality implemented |
+| LoRA | ✅ Complete | Core functionality with VarBuilder support |
+| DoRA | ✅ Complete | Weight-Decomposed LoRA |
+| AdaLoRA | ✅ Complete | SVD-based adaptive rank allocation |
+| IA³ | ✅ Complete | Learned rescaling vectors |
+| Prefix Tuning | ✅ Complete | Trainable prefix vectors |
+| Prompt Tuning | ✅ Complete | Soft prompt embeddings |
 
 ### Core Infrastructure
 | Component | Status | Notes |
@@ -22,59 +27,15 @@ This document analyzes the gaps between the Rust `peft-rs` implementation and th
 
 ## Gaps Identified
 
-### Priority 1: Missing Core Adapters
+### ~~Priority 1: Missing Core Adapters~~ ✅ COMPLETED
 
-#### IA³ (Infused Adapter by Inhibiting and Amplifying Inner Activations)
-**Python PEFT Reference:** `src/peft/tuners/ia3/`
+All priority 1 adapters have been implemented:
+- ✅ **IA³** - Implemented in `src/adapters/ia3.rs`
+- ✅ **AdaLoRA** - Implemented in `src/adapters/adalora.rs`
 
-IA³ is a highly parameter-efficient method that learns rescaling vectors for keys, values, and feedforward layers.
+### ~~Priority 2: LoRA Variants~~ ✅ COMPLETED
 
-**Key features to implement:**
-- `IA3Config` with fields:
-  - `target_modules`: Modules to apply IA³ to
-  - `feedforward_modules`: Modules treated as feedforward (multiplied on input)
-  - `fan_in_fan_out`: Weight storage convention
-  - `init_ia3_weights`: Whether to initialize to ones
-- `IA3Layer` with:
-  - Learnable scaling vectors `ia3_l` (initialized to ones)
-  - Forward: `output = base_output * ia3_scaling` (non-feedforward) or `output = base(input * ia3_scaling)` (feedforward)
-  - Merge/unmerge: multiply/divide base weights by scaling
-
-**Parameters:** Only `in_features` or `out_features` depending on feedforward flag.
-
-#### AdaLoRA (Adaptive Low-Rank Adaptation)
-**Python PEFT Reference:** `src/peft/tuners/adalora/`
-
-AdaLoRA dynamically allocates rank budget during training using SVD-based importance scores.
-
-**Key features to implement:**
-- `AdaLoraConfig` extending `LoraConfig` with:
-  - `target_r`: Target average rank
-  - `init_r`: Initial rank (higher than target)
-  - `tinit`, `tfinal`, `total_step`: Training schedule phases
-  - `deltaT`: Interval between budget allocations
-  - `beta1`, `beta2`: EMA hyperparameters for sensitivity smoothing
-  - `orth_reg_weight`: Orthogonal regularization coefficient
-- `AdaLoraLayer` with SVD parameterization:
-  - `lora_E`: Singular values (diagonal)
-  - `lora_A`: Right singular vectors
-  - `lora_B`: Left singular vectors
-  - `ranknum`: Current rank allocation
-- Rank allocation based on importance scores
-
-### Priority 2: LoRA Variants
-
-#### DoRA (Weight-Decomposed Low-Rank Adaptation)
-**Python PEFT Reference:** `src/peft/tuners/lora/dora.py`
-
-DoRA decomposes weight updates into magnitude and direction components.
-
-**Key features to implement:**
-- Add `use_dora: bool` to `LoraConfig`
-- `DoraLayer` wrapper that:
-  - Maintains `magnitude` vector
-  - Applies weight decomposition: `W = m * (W0 + ΔW) / ||W0 + ΔW||`
-  - Handles column-wise normalization
+- ✅ **DoRA** - Implemented in `src/adapters/lora.rs` (DoraLayer)
 
 #### QLoRA Support
 **Python PEFT Reference:** `src/peft/tuners/lora/bnb.py`
@@ -171,15 +132,15 @@ Uses frozen random matrices with trainable scaling vectors.
 
 ## Recommended Implementation Order
 
-### Phase 1: Core Adapters (High Impact)
-1. **IA³** - Simple, highly efficient, good for benchmarking
-2. **AdaLoRA** - Advanced LoRA variant with practical benefits
+### ~~Phase 1: Core Adapters (High Impact)~~ ✅ COMPLETED
+1. ~~**IA³** - Simple, highly efficient, good for benchmarking~~ ✅
+2. ~~**AdaLoRA** - Advanced LoRA variant with practical benefits~~ ✅
 
-### Phase 2: LoRA Enhancements
-3. **DoRA** - Popular enhancement to LoRA
-4. **Quantization infrastructure** - Essential for large models
+### ~~Phase 2: LoRA Enhancements~~ ✅ COMPLETED
+3. ~~**DoRA** - Popular enhancement to LoRA~~ ✅
+4. **Quantization infrastructure** - Essential for large models (PENDING)
 
-### Phase 3: Model Integration
+### Phase 3: Model Integration (NEXT)
 5. **Weight loading/saving** - Required for practical use
 6. **Model injection** - User-friendly API
 
