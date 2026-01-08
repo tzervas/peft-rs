@@ -54,14 +54,6 @@ Implemented in `src/adapters/lokr.rs` with:
 
 ---
 
-### 1.3 OFT (Orthogonal Fine-Tuning)
-**Status:** ❌ Not Started  
-**Priority:** Medium  
-**Estimated Effort:** 2-3 days
-
-**Description:**  
-Applies orthogonal transformations to preserve pretrained knowledge.
-
 ### ~~1.3 OFT (Orthogonal Fine-Tuning)~~ ✅ COMPLETED
 **Status:** ✅ Complete  
 **Tests:** 10 tests passing
