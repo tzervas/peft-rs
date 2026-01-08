@@ -14,6 +14,10 @@ Comprehensive PEFT (Parameter-Efficient Fine-Tuning) adapter library for Rust.
 - **DoRA** (Weight-Decomposed Low-Rank Adaptation) - Magnitude and direction decomposition
 - **AdaLoRA** (Adaptive Low-Rank Adaptation) - Dynamic rank allocation with SVD parameterization
 - **IA³** (Infused Adapter by Inhibiting and Amplifying) - Learned rescaling vectors
+- **LoHa** (Low-Rank Hadamard Product) - Hadamard product of two low-rank matrices
+- **LoKr** (Low-Rank Kronecker Product) - Kronecker product decomposition
+- **OFT** (Orthogonal Fine-Tuning) - Block-diagonal orthogonal transformations
+- **VeRA** (Vector-based Random Matrix Adaptation) - Ultra-efficient with frozen random matrices
 - **Prefix Tuning** - Prepends trainable vectors to attention keys/values
 - **Prompt Tuning** - Adds learnable soft prompt embeddings
 
@@ -130,17 +134,20 @@ pub trait Mergeable: Adapter {
 | DoRA | ✅ | ✅ |
 | AdaLoRA | ✅ | ✅ |
 | IA³ | ✅ | ✅ |
+| LoHa | ✅ | ✅ |
+| LoKr | ✅ | ✅ |
+| OFT | ✅ | ✅ |
+| VeRA | ✅ | ✅ |
 | Prefix Tuning | ✅ | ✅ |
 | Prompt Tuning | ✅ | ✅ |
-| LoHa/LoKr | 🚧 | ✅ |
-| OFT/BOFT | 🚧 | ✅ |
+| BOFT | 🚧 | ✅ |
 | Weight merging | ✅ | ✅ |
 | CUDA support | ✅ | ✅ |
 | No Python runtime | ✅ | ❌ |
 
 ## Contributing
 
-Contributions welcome! See [docs/GAP_ANALYSIS.md](docs/GAP_ANALYSIS.md) for planned features.
+Contributions welcome! See [docs/GAP_ANALYSIS.md](docs/GAP_ANALYSIS.md) for planned features and [docs/TASK_TRACKER.md](docs/TASK_TRACKER.md) for implementation status.
 
 ## License
 

@@ -12,6 +12,10 @@ This document tracks the implementation progress of features in peft-rs based on
 | **DoRA** | ✅ Complete | 5 tests | Magnitude/direction decomposition |
 | **AdaLoRA** | ✅ Complete | 7 tests | SVD-based rank allocation |
 | **IA³** | ✅ Complete | 8 tests | Learned rescaling vectors |
+| **LoHa** | ✅ Complete | 9 tests | Low-Rank Hadamard Product |
+| **LoKr** | ✅ Complete | 10 tests | Low-Rank Kronecker Product |
+| **OFT** | ✅ Complete | 10 tests | Orthogonal Fine-Tuning with Cayley transform |
+| **VeRA** | ✅ Complete | 10 tests | Ultra-efficient with frozen random matrices |
 | **Prefix Tuning** | ✅ Complete | 2 tests | Trainable prefix vectors |
 | **Prompt Tuning** | ✅ Complete | 3 tests | Soft prompt embeddings |
 | **Adapter trait** | ✅ Complete | - | Forward pass, parameter counting |
@@ -26,68 +30,27 @@ This document tracks the implementation progress of features in peft-rs based on
 
 ## Phase 1: Additional Adapter Types (Priority 3)
 
-### 1.1 LoHa (Low-Rank Hadamard Product)
-**Status:** ❌ Not Started  
-**Priority:** Medium  
-**Estimated Effort:** 2-3 days
+### ~~1.1 LoHa (Low-Rank Hadamard Product)~~ ✅ COMPLETED
+**Status:** ✅ Complete  
+**Tests:** 9 tests passing
 
-**Description:**  
-Uses Hadamard product of two low-rank matrices for more expressive weight updates.
-
-**Key Implementation Details:**
-- `LoHaConfig` with fields:
-  - `r1`, `r2`: Ranks for the two low-rank decompositions
-  - `alpha`: Scaling factor
-  - `target_modules`: Target modules
-- `LoHaLayer` with:
-  - Four matrices: `A1`, `B1`, `A2`, `B2`
-  - Forward: `ΔW = (A1 ⊗ B1) ⊙ (A2 ⊗ B2)` where ⊙ is Hadamard product
-  - Merge/unmerge support
-
-**Tasks:**
-- [ ] Create `src/adapters/loha.rs`
-- [ ] Implement `LoHaConfig` with validation
-- [ ] Implement `LoHaLayer` struct
-- [ ] Implement `Adapter` trait
-- [ ] Implement `Mergeable` trait
-- [ ] Implement `Trainable` trait
-- [ ] Add unit tests
-- [ ] Export from `src/adapters/mod.rs`
-- [ ] Add to `src/lib.rs` public exports
-- [ ] Update README.md
+Implemented in `src/adapters/loha.rs` with:
+- `LoHaConfig` with rank, alpha, target_modules
+- `LoHaLayer` with four matrices (A1, B1, A2, B2)
+- Forward: `ΔW = (A1 @ B1) ⊙ (A2 @ B2)` (Hadamard product)
+- Full Adapter, Mergeable, Trainable trait implementations
 
 ---
 
-### 1.2 LoKr (Low-Rank Kronecker Product)
-**Status:** ❌ Not Started  
-**Priority:** Medium  
-**Estimated Effort:** 2-3 days
+### ~~1.2 LoKr (Low-Rank Kronecker Product)~~ ✅ COMPLETED
+**Status:** ✅ Complete  
+**Tests:** 10 tests passing
 
-**Description:**  
-Uses Kronecker product for weight decomposition.
-
-**Key Implementation Details:**
-- `LoKrConfig` with fields:
-  - `r`: Rank
-  - `alpha`: Scaling factor
-  - `factor`: Kronecker factorization parameter
-  - `target_modules`: Target modules
-- `LoKrLayer` with:
-  - Kronecker factored matrices
-  - Forward: `ΔW = A ⊗ B` where ⊗ is Kronecker product
-  - Efficient computation using decomposition
-
-**Tasks:**
-- [ ] Create `src/adapters/lokr.rs`
-- [ ] Implement `LoKrConfig` with validation
-- [ ] Implement `LoKrLayer` struct
-- [ ] Implement `Adapter` trait
-- [ ] Implement `Mergeable` trait
-- [ ] Implement `Trainable` trait
-- [ ] Add unit tests
-- [ ] Export from `src/adapters/mod.rs`
-- [ ] Add to `src/lib.rs` public exports
-- [ ] Update README.md
+Implemented in `src/adapters/lokr.rs` with:
+- `LoKrConfig` with rank, alpha, factor, target_modules
+- `LoKrLayer` with Kronecker factorization
+- Automatic factorization when factor not specified
+- Full Adapter, Mergeable, Trainable trait implementations
 
 ---
 
@@ -99,29 +62,14 @@ Uses Kronecker product for weight decomposition.
 **Description:**  
 Applies orthogonal transformations to preserve pretrained knowledge.
 
-**Key Implementation Details:**
-- `OftConfig` with fields:
-  - `r`: Number of blocks
-  - `coft`: Whether to use constrained OFT
-  - `eps`: Numerical stability epsilon
-  - `target_modules`: Target modules
-- `OftLayer` with:
-  - Block-diagonal orthogonal matrix parameterization
-  - Forward: `W' = W @ R` where R is orthogonal
-  - Cayley parameterization for guaranteed orthogonality
+### ~~1.3 OFT (Orthogonal Fine-Tuning)~~ ✅ COMPLETED
+**Status:** ✅ Complete  
+**Tests:** 10 tests passing
 
-**Tasks:**
-- [ ] Create `src/adapters/oft.rs`
-- [ ] Implement `OftConfig` with validation
-- [ ] Implement `OftLayer` struct
-- [ ] Implement Cayley transform helper
-- [ ] Implement `Adapter` trait
-- [ ] Implement `Mergeable` trait
-- [ ] Implement `Trainable` trait
-- [ ] Add unit tests
-- [ ] Export from `src/adapters/mod.rs`
-- [ ] Add to `src/lib.rs` public exports
-- [ ] Update README.md
+Implemented in `src/adapters/oft.rs` with:
+- `OftConfig` with r (blocks), coft, eps, target_modules
+- `OftLayer` with block-diagonal orthogonal matrix via Cayley transform
+- Full Adapter, Mergeable, Trainable trait implementations
 
 ---
 
@@ -158,37 +106,15 @@ Uses butterfly factorization for efficient orthogonal transformations.
 
 ---
 
-### 1.5 VeRA (Vector-based Random Matrix Adaptation)
-**Status:** ❌ Not Started  
-**Priority:** Medium  
-**Estimated Effort:** 2-3 days
+### ~~1.5 VeRA (Vector-based Random Matrix Adaptation)~~ ✅ COMPLETED
+**Status:** ✅ Complete  
+**Tests:** 10 tests passing
 
-**Description:**  
-Uses frozen random matrices with trainable scaling vectors for ultra-efficient adaptation.
-
-**Key Implementation Details:**
-- `VeraConfig` with fields:
-  - `r`: Rank
-  - `d_initial`: Initial value for scaling vector d
-  - `target_modules`: Target modules
-  - `projection_prng_key`: Seed for random projection
-- `VeraLayer` with:
-  - Frozen random matrices `A`, `B`
-  - Trainable scaling vectors `d`, `b`
-  - Forward: `ΔW = B @ diag(d) @ A` (B, A frozen)
-
-**Tasks:**
-- [ ] Create `src/adapters/vera.rs`
-- [ ] Implement `VeraConfig` with validation
-- [ ] Implement `VeraLayer` struct
-- [ ] Implement frozen random matrix initialization
-- [ ] Implement `Adapter` trait
-- [ ] Implement `Mergeable` trait
-- [ ] Implement `Trainable` trait
-- [ ] Add unit tests
-- [ ] Export from `src/adapters/mod.rs`
-- [ ] Add to `src/lib.rs` public exports
-- [ ] Update README.md
+Implemented in `src/adapters/vera.rs` with:
+- `VeraConfig` with r, d_initial, projection_prng_key, target_modules
+- `VeraLayer` with frozen random A/B matrices and trainable d vector
+- Ultra-efficient: only r parameters (vs 2*r*(in+out) for LoRA)
+- Full Adapter, Mergeable, Trainable trait implementations
 
 ---
 
