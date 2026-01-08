@@ -4,9 +4,15 @@
 //!
 //! This crate provides modular implementations of various PEFT methods:
 //! - **LoRA** (Low-Rank Adaptation)
+//! - **DoRA** (Weight-Decomposed Low-Rank Adaptation)
+//! - **AdaLoRA** (Adaptive Low-Rank Adaptation)
+//! - **IA³** (Infused Adapter by Inhibiting and Amplifying Inner Activations)
+//! - **LoHa** (Low-Rank Hadamard Product)
+//! - **LoKr** (Low-Rank Kronecker Product)
+//! - **OFT** (Orthogonal Fine-Tuning)
+//! - **VeRA** (Vector-based Random Matrix Adaptation)
 //! - **Prefix Tuning**
 //! - **Prompt Tuning**
-//! - **IA³** (Infused Adapter by Inhibiting and Amplifying Inner Activations)
 //!
 //! ## Quick Start
 //!
@@ -42,8 +48,12 @@ pub mod traits;
 
 pub use adapters::adalora::{AdaLoraConfig, AdaLoraLayer};
 pub use adapters::ia3::{Ia3Config, Ia3Layer};
+pub use adapters::loha::{LoHaConfig, LoHaLayer};
+pub use adapters::lokr::{LoKrConfig, LoKrLayer};
 pub use adapters::lora::{DoraLayer, LoraConfig, LoraLayer};
+pub use adapters::oft::{OftConfig, OftLayer};
 pub use adapters::prefix_tuning::{PrefixTuningConfig, PrefixTuningLayer};
 pub use adapters::prompt_tuning::{PromptTuningConfig, PromptTuningLayer};
+pub use adapters::vera::{VeraConfig, VeraLayer};
 pub use error::{PeftError, Result};
 pub use traits::{Adapter, AdapterConfig, Mergeable, Trainable};

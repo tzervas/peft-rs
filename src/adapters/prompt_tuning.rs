@@ -5,7 +5,7 @@
 //!
 //! Reference: <https://arxiv.org/abs/2104.08691>
 
-use candle_core::{DType, Device, Tensor};
+use candle_core::{Device, Tensor};
 use serde::{Deserialize, Serialize};
 
 use crate::error::{PeftError, Result};
@@ -137,6 +137,7 @@ impl Adapter for PromptTuningLayer {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use candle_core::DType;
 
     #[test]
     fn test_prompt_tuning_creation() {
