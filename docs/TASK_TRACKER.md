@@ -14,7 +14,7 @@ This document tracks the implementation progress of features in peft-rs based on
 | **IA³** | ✅ Complete | 8 tests | Learned rescaling vectors |
 | **LoHa** | ✅ Complete | 9 tests | Low-Rank Hadamard Product |
 | **LoKr** | ✅ Complete | 10 tests | Low-Rank Kronecker Product |
-| **OFT** | ✅ Complete | 10 tests | Orthogonal Fine-Tuning with Cayley transform |
+| **OFT** | ✅ Complete | 14 tests | Orthogonal Fine-Tuning with switchable exact/approx Cayley |
 | **VeRA** | ✅ Complete | 10 tests | Ultra-efficient with frozen random matrices |
 | **Prefix Tuning** | ✅ Complete | 2 tests | Trainable prefix vectors |
 | **Prompt Tuning** | ✅ Complete | 3 tests | Soft prompt embeddings |
@@ -56,11 +56,14 @@ Implemented in `src/adapters/lokr.rs` with:
 
 ### ~~1.3 OFT (Orthogonal Fine-Tuning)~~ ✅ COMPLETED
 **Status:** ✅ Complete  
-**Tests:** 10 tests passing
+**Tests:** 14 tests passing
 
 Implemented in `src/adapters/oft.rs` with:
-- `OftConfig` with r (blocks), coft, eps, target_modules
+- `OftConfig` with r (blocks), coft, eps, target_modules, `use_exact_cayley`
 - `OftLayer` with block-diagonal orthogonal matrix via Cayley transform
+- **Switchable accuracy modes:**
+  - Approximation mode (default): Neumann series `(I + Q)^{-1} ≈ I - Q + Q²` - efficient
+  - Exact mode (`use_exact_cayley: true`): Newton-Schulz iteration - higher accuracy
 - Full Adapter, Mergeable, Trainable trait implementations
 
 ---
