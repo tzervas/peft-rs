@@ -11,6 +11,7 @@ Comprehensive PEFT (Parameter-Efficient Fine-Tuning) adapter library for Rust.
 `peft-rs` provides modular implementations of various PEFT methods for fine-tuning large language models efficiently:
 
 - **LoRA** (Low-Rank Adaptation) - Decomposes weight updates into low-rank matrices
+- **DoRA** (Weight-Decomposed Low-Rank Adaptation) - Magnitude and direction decomposition
 - **AdaLoRA** (Adaptive Low-Rank Adaptation) - Dynamic rank allocation with SVD parameterization
 - **IA³** (Infused Adapter by Inhibiting and Amplifying) - Learned rescaling vectors
 - **Prefix Tuning** - Prepends trainable vectors to attention keys/values
@@ -126,11 +127,11 @@ pub trait Mergeable: Adapter {
 | Feature | peft-rs | HuggingFace PEFT |
 |---------|---------|------------------|
 | LoRA | ✅ | ✅ |
+| DoRA | ✅ | ✅ |
 | AdaLoRA | ✅ | ✅ |
 | IA³ | ✅ | ✅ |
 | Prefix Tuning | ✅ | ✅ |
 | Prompt Tuning | ✅ | ✅ |
-| DoRA | 🚧 | ✅ |
 | LoHa/LoKr | 🚧 | ✅ |
 | OFT/BOFT | 🚧 | ✅ |
 | Weight merging | ✅ | ✅ |

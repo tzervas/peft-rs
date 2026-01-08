@@ -401,6 +401,10 @@ impl Mergeable for AdaLoraLayer {
 
 impl Trainable for AdaLoraLayer {
     fn register_parameters(&self, _var_map: &mut VarMap, _prefix: &str) -> Result<()> {
+        // Note: In the current design, tensors are created directly.
+        // For full training support, tensors should be created via VarBuilder
+        // during construction, which automatically registers them.
+        // This is a simplified implementation suitable for inference.
         Ok(())
     }
 

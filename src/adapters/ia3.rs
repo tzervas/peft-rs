@@ -252,7 +252,10 @@ impl Mergeable for Ia3Layer {
 
 impl Trainable for Ia3Layer {
     fn register_parameters(&self, _var_map: &mut VarMap, _prefix: &str) -> Result<()> {
-        // Parameters would be registered via VarBuilder during construction
+        // Note: In the current design, tensors are created directly.
+        // For full training support, tensors should be created via VarBuilder
+        // during construction, which automatically registers them.
+        // This is a simplified implementation suitable for inference.
         Ok(())
     }
 
