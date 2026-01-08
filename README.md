@@ -144,8 +144,4 @@ Contributions welcome! See [docs/GAP_ANALYSIS.md](docs/GAP_ANALYSIS.md) for plan
 
 ## License
 
-Licensed under either of:
-- Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE))
-- MIT License ([LICENSE-MIT](LICENSE-MIT))
-
-at your option.
+MIT Licensed ([LICENSE-MIT](LICENSE-MIT)
