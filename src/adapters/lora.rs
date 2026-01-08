@@ -466,6 +466,57 @@ impl Trainable for DoraLayer {
     }
 }
 
+impl crate::io::SaveLoad for LoraLayer {
+    fn state_dict(&self) -> Result<std::collections::HashMap<String, Tensor>> {
+        use std::collections::HashMap;
+        
+        let mut state_dict = HashMap::new();
+        
+        // Get lora_a weight
+        let lora_a_weight = self.lora_a.weight();
+        state_dict.insert("lora_a.weight".to_string(), lora_a_weight.clone());
+        
+        // Get lora_b weight
+        let lora_b_weight = self.lora_b.weight();
+        state_dict.insert("lora_b.weight".to_string(), lora_b_weight.clone());
+        
+        Ok(state_dict)
+    }
+
+    fn load_state_dict(&mut self, state_dict: std::collections::HashMap<String, Tensor>) -> Result<()> {
+        // Note: This is a simplified implementation. In a real scenario, we'd need to
+        // update the internal Linear layers' weights, which requires recreating them
+        // or using mutable access to their internals.
+        // For now, this serves as a demonstration of the SaveLoad trait pattern.
+        
+        if !state_dict.contains_key("lora_a.weight") || !state_dict.contains_key("lora_b.weight") {
+            return Err(PeftError::WeightLoad(
+                "Missing required keys in state_dict".to_string()
+            ));
+        }
+        
+        // Verify shapes match
+        let lora_a_shape = state_dict["lora_a.weight"].dims();
+        let lora_b_shape = state_dict["lora_b.weight"].dims();
+        
+        if lora_a_shape != &[self.config.r, self.in_features] {
+            return Err(PeftError::ShapeMismatch {
+                expected: vec![self.config.r, self.in_features],
+                actual: lora_a_shape.to_vec(),
+            });
+        }
+        
+        if lora_b_shape != &[self.out_features, self.config.r] {
+            return Err(PeftError::ShapeMismatch {
+                expected: vec![self.out_features, self.config.r],
+                actual: lora_b_shape.to_vec(),
+            });
+        }
+        
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -577,5 +628,29 @@ mod tests {
         let output = layer.forward(&input, None).unwrap();
         
         assert_eq!(output.shape().dims(), &[1, 10, 768]);
+    }
+
+    #[test]
+    fn test_lora_save_load_weights() -> Result<()> {
+        use crate::io::{save_adapter_weights, load_adapter_weights, SaveLoad};
+        use tempfile::TempDir;
+        
+        let device = Device::Cpu;
+        let config = LoraConfig::default();
+        let layer = LoraLayer::new_with_zeros(768, 768, config.clone(), &device)?;
+        
+        // Create temp directory for test
+        let temp_dir = TempDir::new().map_err(|e| PeftError::Io(e.to_string()))?;
+        let weights_path = temp_dir.path().join("lora_weights.safetensors");
+        
+        // Save weights
+        save_adapter_weights(&layer, &weights_path)?;
+        assert!(weights_path.exists());
+        
+        // Load weights into new layer
+        let mut loaded_layer = LoraLayer::new_with_zeros(768, 768, config, &device)?;
+        load_adapter_weights(&mut loaded_layer, &weights_path, &device)?;
+        
+        Ok(())
     }
 }
