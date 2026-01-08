@@ -45,6 +45,7 @@ pub mod adapters;
 pub mod config;
 pub mod error;
 pub mod io;
+pub mod registry;
 pub mod traits;
 
 pub use adapters::adalora::{AdaLoraConfig, AdaLoraLayer};
@@ -60,4 +61,5 @@ pub use error::{PeftError, Result};
 pub use io::{
     load_adapter_config, load_adapter_weights, save_adapter_config, save_adapter_weights, SaveLoad,
 };
+pub use registry::AdapterRegistry;
 pub use traits::{Adapter, AdapterConfig, Mergeable, Trainable};

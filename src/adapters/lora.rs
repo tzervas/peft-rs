@@ -632,7 +632,7 @@ mod tests {
 
     #[test]
     fn test_lora_save_load_weights() -> Result<()> {
-        use crate::io::{save_adapter_weights, load_adapter_weights, SaveLoad};
+        use crate::io::{save_adapter_weights, load_adapter_weights};
         use tempfile::TempDir;
         
         let device = Device::Cpu;
