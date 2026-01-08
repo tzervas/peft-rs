@@ -40,7 +40,9 @@ pub mod config;
 pub mod error;
 pub mod traits;
 
-pub use adapters::lora::{LoraConfig, LoraLayer};
+pub use adapters::adalora::{AdaLoraConfig, AdaLoraLayer};
+pub use adapters::ia3::{Ia3Config, Ia3Layer};
+pub use adapters::lora::{DoraLayer, LoraConfig, LoraLayer};
 pub use adapters::prefix_tuning::{PrefixTuningConfig, PrefixTuningLayer};
 pub use adapters::prompt_tuning::{PromptTuningConfig, PromptTuningLayer};
 pub use error::{PeftError, Result};
