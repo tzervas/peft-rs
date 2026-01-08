@@ -5,7 +5,7 @@
 //!
 //! Reference: <https://arxiv.org/abs/2106.09685>
 
-use candle_core::{DType, Device, Tensor};
+use candle_core::{DType, Device, Module, Tensor};
 use candle_nn::{linear_no_bias, Linear, VarBuilder, VarMap};
 use serde::{Deserialize, Serialize};
 
@@ -194,11 +194,12 @@ impl Adapter for LoraLayer {
         // LoRA forward: x @ A^T @ B^T * scaling
         let lora_out = self.lora_a.forward(input)?;
         let lora_out = self.lora_b.forward(&lora_out)?;
-        let lora_out = (lora_out * self.scaling)?;
+        let scaling = Tensor::new(self.scaling as f32, lora_out.device())?;
+        let lora_out = lora_out.broadcast_mul(&scaling)?;
 
         // Add to base output if provided
         match base_output {
-            Some(base) => Ok((base + lora_out)?),
+            Some(base) => Ok(base.broadcast_add(&lora_out)?),
             None => Ok(lora_out),
         }
     }
@@ -219,20 +220,22 @@ impl Mergeable for LoraLayer {
         let a_weight = self.lora_a.weight();
         let b_weight = self.lora_b.weight();
         
-        let delta_w = b_weight.matmul(&a_weight)?;
-        let delta_w = (delta_w * self.scaling)?;
+        let delta_w = b_weight.matmul(a_weight)?;
+        let scaling = Tensor::new(self.scaling as f32, delta_w.device())?;
+        let delta_w = delta_w.broadcast_mul(&scaling)?;
         
-        Ok((base_weight + delta_w)?)
+        Ok(base_weight.broadcast_add(&delta_w)?)
     }
 
     fn unmerge(&self, merged_weight: &Tensor) -> Result<Tensor> {
         let a_weight = self.lora_a.weight();
         let b_weight = self.lora_b.weight();
         
-        let delta_w = b_weight.matmul(&a_weight)?;
-        let delta_w = (delta_w * self.scaling)?;
+        let delta_w = b_weight.matmul(a_weight)?;
+        let scaling = Tensor::new(self.scaling as f32, delta_w.device())?;
+        let delta_w = delta_w.broadcast_mul(&scaling)?;
         
-        Ok((merged_weight - delta_w)?)
+        Ok(merged_weight.broadcast_sub(&delta_w)?)
     }
 }
 

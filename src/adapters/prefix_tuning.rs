@@ -5,7 +5,7 @@
 //!
 //! Reference: <https://arxiv.org/abs/2101.00190>
 
-use candle_core::{DType, Device, Tensor};
+use candle_core::{Device, IndexOp, Tensor};
 use serde::{Deserialize, Serialize};
 
 use crate::error::{PeftError, Result};
