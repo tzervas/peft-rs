@@ -9,7 +9,6 @@
 //!
 //! Reference: <https://arxiv.org/abs/2311.06243>
 
-#![allow(clippy::missing_errors_doc)]
 #![allow(clippy::uninlined_format_args)]
 
 use std::collections::HashMap;
@@ -160,6 +159,9 @@ impl BoftLayer {
     /// * `out_features` - Output dimension  
     /// * `config` - BOFT configuration
     /// * `device` - Device to create tensors on
+    ///
+    /// # Errors
+    /// Returns error if configuration is invalid or tensor initialization fails.
     pub fn new(
         in_features: usize,
         out_features: usize,
@@ -666,10 +668,7 @@ mod tests {
         let config = BoftConfig::default();
         assert_eq!(config.boft_block_num, 4);
         assert_eq!(config.boft_n_butterfly_factor, 1);
-        #[allow(clippy::float_cmp)]
-        {
-            assert_eq!(config.boft_dropout, 0.0);
-        }
+        assert!((config.boft_dropout - 0.0).abs() < f64::EPSILON);
     }
 
     #[test]

@@ -8,7 +8,6 @@
 #![allow(clippy::doc_markdown)]
 #![allow(clippy::cast_possible_truncation)]
 #![allow(clippy::cast_precision_loss)]
-#![allow(clippy::missing_errors_doc)]
 #![allow(clippy::needless_pass_by_value)]
 
 use candle_core::{DType, Device, Module, Tensor};
@@ -154,6 +153,9 @@ impl LoraLayer {
     /// * `out_features` - Output dimension
     /// * `config` - LoRA configuration
     /// * `device` - Device to create tensors on
+    ///
+    /// # Errors
+    /// Returns error if configuration is invalid or tensor initialization fails.
     pub fn new_with_zeros(
         in_features: usize,
         out_features: usize,

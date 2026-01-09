@@ -12,7 +12,6 @@
 #![allow(clippy::cast_possible_truncation)]
 #![allow(clippy::cast_precision_loss)]
 #![allow(clippy::cast_sign_loss)]
-#![allow(clippy::missing_errors_doc)]
 #![allow(clippy::uninlined_format_args)]
 
 use candle_core::{DType, Device, Tensor};
@@ -182,6 +181,9 @@ impl AdaLoraLayer {
     /// * `out_features` - Output dimension
     /// * `config` - AdaLoRA configuration
     /// * `device` - Device to create tensors on
+    ///
+    /// # Errors
+    /// Returns error if configuration is invalid or tensor initialization fails.
     pub fn new(
         in_features: usize,
         out_features: usize,
@@ -253,6 +255,9 @@ impl AdaLoraLayer {
     /// # Arguments
     /// * `importance_scores` - Importance score for each rank [init_r]
     /// * `budget` - Number of ranks to keep
+    ///
+    /// # Errors
+    /// Returns error if tensor operations fail.
     pub fn update_rank_mask(&mut self, importance_scores: &Tensor, budget: usize) -> Result<()> {
         // Get the indices of top-k importance scores
         // For simplicity, we'll create a mask based on a threshold
@@ -291,6 +296,9 @@ impl AdaLoraLayer {
     /// Compute the orthogonal regularization loss.
     ///
     /// Encourages P^T P ≈ I and Q Q^T ≈ I.
+    ///
+    /// # Errors
+    /// Returns error if tensor operations fail.
     pub fn orthogonal_regularization(&self) -> Result<Tensor> {
         // P^T P - I
         let pta = self.lora_a.t()?.matmul(&self.lora_a)?;
@@ -308,6 +316,9 @@ impl AdaLoraLayer {
     /// Get the importance scores for rank allocation.
     ///
     /// The importance is based on the magnitude of singular values.
+    ///
+    /// # Errors
+    /// Returns error if tensor operations fail.
     pub fn get_importance_scores(&self) -> Result<Tensor> {
         // Simple importance: absolute value of singular values
         Ok(self.lora_e.abs()?)

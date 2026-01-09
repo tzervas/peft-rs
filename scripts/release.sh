@@ -61,11 +61,11 @@ else
 fi
 
 echo -n "Running clippy... "
-if cargo clippy --all-targets --quiet -- -D warnings 2>&1 | grep -q "error:"; then
+if cargo clippy --all-targets --quiet -- -D warnings; then
+    echo -e "${GREEN}✅${NC}"
+else
     echo -e "${RED}❌ Clippy errors found${NC}"
     exit 1
-else
-    echo -e "${GREEN}✅${NC}"
 fi
 
 echo -n "Checking format... "
@@ -84,11 +84,11 @@ else
 fi
 
 echo -n "Building documentation... "
-if cargo doc --no-deps --quiet 2>&1 | grep -q "error:"; then
+if cargo doc --no-deps --quiet; then
+    echo -e "${GREEN}✅${NC}"
+else
     echo -e "${RED}❌ Doc build failed${NC}"
     exit 1
-else
-    echo -e "${GREEN}✅${NC}"
 fi
 
 echo ""

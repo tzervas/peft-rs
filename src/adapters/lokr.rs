@@ -10,7 +10,6 @@
 #![allow(clippy::cast_possible_truncation)]
 #![allow(clippy::cast_precision_loss)]
 #![allow(clippy::cast_sign_loss)]
-#![allow(clippy::missing_errors_doc)]
 
 use candle_core::{Device, Tensor};
 use candle_nn::VarMap;
@@ -110,6 +109,9 @@ impl LoKrLayer {
     /// * `out_features` - Output dimension
     /// * `config` - LoKr configuration
     /// * `device` - Device to create tensors on
+    ///
+    /// # Errors
+    /// Returns error if configuration is invalid or tensor initialization fails.
     pub fn new(
         in_features: usize,
         out_features: usize,

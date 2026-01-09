@@ -13,10 +13,10 @@ echo "║         GPG Signing Setup Verification                   ║"
 echo "╚═══════════════════════════════════════════════════════════╝"
 echo ""
 
-# Required details
-REQUIRED_NAME="Tyler Zervas"
-REQUIRED_EMAIL="tz-dev@vectorweight.com"
-REQUIRED_USER="tzervas"
+# Required details (configurable via environment variables)
+REQUIRED_NAME="${GPG_REQUIRED_NAME:-Tyler Zervas}"
+REQUIRED_EMAIL="${GPG_REQUIRED_EMAIL:-tz-dev@vectorweight.com}"
+REQUIRED_USER="${GPG_REQUIRED_USER:-tzervas}"
 
 echo "Checking GPG configuration for releases..."
 echo ""
@@ -83,14 +83,14 @@ else
     echo "   Set with: git config --global user.signingkey ${KEY_ID}"
 fi
 
-if [ "$GIT_COMMIT_SIGN" = "true" ]; then
+if [ "$GIT_COMMIT_SIGN" = "true" ] || [ "$GIT_COMMIT_SIGN" = "1" ] || [ "$GIT_COMMIT_SIGN" = "yes" ]; then
     echo -e "${GREEN}✅ Commit signing enabled${NC}"
 else
     echo -e "${YELLOW}⚠️  Commit signing not enabled${NC}"
     echo "   Enable with: git config --global commit.gpgsign true"
 fi
 
-if [ "$GIT_TAG_SIGN" = "true" ]; then
+if [ "$GIT_TAG_SIGN" = "true" ] || [ "$GIT_TAG_SIGN" = "1" ] || [ "$GIT_TAG_SIGN" = "yes" ]; then
     echo -e "${GREEN}✅ Tag signing enabled${NC}"
 else
     echo -e "${YELLOW}⚠️  Tag signing not enabled${NC}"
@@ -129,13 +129,13 @@ echo "║                       SUMMARY                             ║"
 echo "╚═══════════════════════════════════════════════════════════╝"
 echo ""
 
-if [ -n "$KEY_ID" ] && [ "$GIT_TAG_SIGN" = "true" ] && [ "$GIT_COMMIT_SIGN" = "true" ]; then
+if [ -n "$KEY_ID" ] && { [ "$GIT_TAG_SIGN" = "true" ] || [ "$GIT_TAG_SIGN" = "1" ] || [ "$GIT_TAG_SIGN" = "yes" ]; } && { [ "$GIT_COMMIT_SIGN" = "true" ] || [ "$GIT_COMMIT_SIGN" = "1" ] || [ "$GIT_COMMIT_SIGN" = "yes" ]; }; then
     echo -e "${GREEN}✅ All GPG signing requirements met!${NC}"
     echo ""
     echo "Ready to create signed releases:"
-    echo "  git tag -s v0.4.0 -m 'Release v0.4.0'"
-    echo "  git tag -v v0.4.0"
-    echo "  git push origin v0.4.0"
+    echo "  git tag -s vX.Y.Z -m 'Release vX.Y.Z'"
+    echo "  git tag -v vX.Y.Z"
+    echo "  git push origin vX.Y.Z"
     echo ""
     exit 0
 else
@@ -145,10 +145,10 @@ else
     if [ -z "$GIT_SIGNING_KEY" ]; then
         echo "  git config --global user.signingkey ${KEY_ID}"
     fi
-    if [ "$GIT_COMMIT_SIGN" != "true" ]; then
+    if [ "$GIT_COMMIT_SIGN" != "true" ] && [ "$GIT_COMMIT_SIGN" != "1" ] && [ "$GIT_COMMIT_SIGN" != "yes" ]; then
         echo "  git config --global commit.gpgsign true"
     fi
-    if [ "$GIT_TAG_SIGN" != "true" ]; then
+    if [ "$GIT_TAG_SIGN" != "true" ] && [ "$GIT_TAG_SIGN" != "1" ] && [ "$GIT_TAG_SIGN" != "yes" ]; then
         echo "  git config --global tag.gpgsign true"
     fi
     echo ""
