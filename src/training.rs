@@ -49,7 +49,7 @@ impl LrSchedule {
         match self {
             Self::Constant => base_lr,
             Self::LinearWarmup { warmup_steps } => {
-                if step >= *warmup_steps {
+                if *warmup_steps == 0 || step >= *warmup_steps {
                     base_lr
                 } else {
                     base_lr * (step as f64 / *warmup_steps as f64)
@@ -59,7 +59,7 @@ impl LrSchedule {
                 total_steps,
                 min_lr,
             } => {
-                if step >= *total_steps {
+                if *total_steps == 0 || step >= *total_steps {
                     *min_lr
                 } else {
                     let progress = step as f64 / *total_steps as f64;
@@ -71,7 +71,7 @@ impl LrSchedule {
                 total_steps,
                 min_lr,
             } => {
-                if step >= *total_steps {
+                if *total_steps == 0 || step >= *total_steps {
                     *min_lr
                 } else {
                     let progress = step as f64 / *total_steps as f64;
@@ -376,5 +376,33 @@ mod tests {
             state.step();
         }
         assert!((state.current_lr() - 0.001).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_zero_warmup_steps() {
+        // Edge case: zero warmup steps should return base_lr immediately
+        let schedule = LrSchedule::LinearWarmup { warmup_steps: 0 };
+        assert!((schedule.get_lr(0, 0.001) - 0.001).abs() < 1e-10);
+        assert!((schedule.get_lr(100, 0.001) - 0.001).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_zero_total_steps_cosine() {
+        // Edge case: zero total steps should return min_lr immediately
+        let schedule = LrSchedule::CosineAnnealing {
+            total_steps: 0,
+            min_lr: 0.0001,
+        };
+        assert!((schedule.get_lr(0, 0.001) - 0.0001).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_zero_total_steps_linear_decay() {
+        // Edge case: zero total steps should return min_lr immediately
+        let schedule = LrSchedule::LinearDecay {
+            total_steps: 0,
+            min_lr: 0.0001,
+        };
+        assert!((schedule.get_lr(0, 0.001) - 0.0001).abs() < 1e-10);
     }
 }

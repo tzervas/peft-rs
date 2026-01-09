@@ -24,8 +24,17 @@ This document tracks the implementation progress of features in peft-rs based on
 | **Trainable trait** | ✅ Complete | - | Parameter registration, freeze/unfreeze |
 | **AdapterConfig trait** | ✅ Complete | - | Configuration validation |
 | **Error handling** | ✅ Complete | - | PeftError enum |
+| **Weight I/O** | ✅ Complete | 3 tests | safetensors + save_pretrained/load_pretrained |
+| **Model Integration** | ✅ Complete | 10 tests | PeftModel wrapper with pattern matching |
+| **Multi-Adapter Registry** | ✅ Complete | 12 tests | AdapterRegistry with switching |
+| **Training Utilities** | ✅ Complete | 9 tests | LR schedules, training state |
 
 ### 🚧 In Progress / Pending Features
+
+| Feature | Status | Priority |
+|---------|--------|----------|
+| **Quantization Support** | ❌ Not Started | Low |
+| **Inference Utilities** | 🟡 Partial | Medium |
 
 ---
 
@@ -97,84 +106,71 @@ Implemented in `src/adapters/vera.rs` with:
 
 ## Phase 2: Infrastructure Improvements (Priority 4)
 
-### 2.1 Weight Loading/Saving
-**Status:** ❌ Not Started  
-**Priority:** High  
-**Estimated Effort:** 3-4 days
+### ~~2.1 Weight Loading/Saving~~ ✅ COMPLETED
+**Status:** ✅ Complete  
+**Tests:** 3 tests passing
 
-**Description:**  
-Safetensors integration for saving and loading adapter weights.
-
-**Key Implementation Details:**
-- `save_pretrained()` method for adapters
-- `load_pretrained()` method for adapters
-- Safetensors file format support
-- Config JSON serialization
-
-**Tasks:**
-- [ ] Add `safetensors` dependency to Cargo.toml
-- [ ] Create `src/io.rs` or `src/persistence.rs` module
-- [ ] Implement `save_adapter_weights()` function
-- [ ] Implement `load_adapter_weights()` function
-- [ ] Implement `save_adapter_config()` function
-- [ ] Implement `load_adapter_config()` function
-- [ ] Add `SaveLoad` trait for adapters
-- [ ] Add unit tests
-- [ ] Add integration tests with actual files
-- [ ] Update documentation
+Implemented in `src/io.rs` with:
+- `save_adapter_weights()` - Saves adapter tensors to safetensors
+- `load_adapter_weights()` - Loads adapter tensors from safetensors
+- `save_adapter_config()` - Saves config to JSON
+- `load_adapter_config()` - Loads config from JSON
+- `save_pretrained()` - Saves adapter + config to HuggingFace PEFT format directory
+- `load_pretrained()` - Loads adapter + config from HuggingFace PEFT format directory
+- `SaveLoad` trait for adapters
+- Constants: `ADAPTER_WEIGHTS_FILENAME`, `ADAPTER_CONFIG_FILENAME`
 
 ---
 
-### 2.2 Model Integration
-**Status:** ❌ Not Started  
-**Priority:** High  
-**Estimated Effort:** 4-5 days
+### ~~2.2 Model Integration~~ ✅ COMPLETED
+**Status:** ✅ Complete  
+**Tests:** 10 tests passing
 
-**Description:**  
-Automatic adapter injection into models.
-
-**Key Implementation Details:**
-- `get_peft_model()` function
-- `inject_adapter()` for wrapping layers
-- Module name matching with glob/regex
-- `PeftModel` wrapper struct
-
-**Tasks:**
-- [ ] Create `src/model.rs` module
-- [ ] Define `PeftModel` wrapper struct
-- [ ] Implement module name pattern matching
-- [ ] Implement `inject_adapter()` function
-- [ ] Implement `get_peft_model()` function
-- [ ] Add adapter management methods
-- [ ] Add unit tests
-- [ ] Add integration tests
-- [ ] Update documentation
+Implemented in `src/model.rs` with:
+- `PeftModel<A>` wrapper struct for module-level adapter management
+- `ModulePattern` enum with pattern matching:
+  - Exact matching: `"encoder.layer.0"`
+  - Suffix matching: `"*.attention"`
+  - Prefix matching: `"layer.*"`
+  - All matching: `"*"`
+- `add_adapter()` - Add adapter to modules matching pattern
+- `set_adapter()` - Switch adapter for specific module
+- `set_adapter_all()` - Switch adapter for all modules
+- `forward_module()` - Apply active adapter to module input
+- `get_peft_model()` convenience function
 
 ---
 
-### 2.3 Multi-Adapter Support
-**Status:** ❌ Not Started  
-**Priority:** Medium  
-**Estimated Effort:** 3-4 days
+### ~~2.3 Multi-Adapter Support~~ ✅ COMPLETED
+**Status:** ✅ Complete  
+**Tests:** 12 tests passing
 
-**Description:**  
-Support for multiple adapters with switching and composition.
+Implemented in `src/registry.rs` with:
+- `AdapterRegistry<A>` struct for named adapter management
+- `register_adapter()` - Register adapter with unique name
+- `set_active_adapter()` - Switch active adapter by name
+- `get_adapter()` / `get_adapter_mut()` - Access adapters by name
+- `get_active_adapter()` - Get currently active adapter
+- `remove_adapter()` - Remove adapter by name
+- `forward()` - Apply active adapter to input
+- `adapter_names()` / `len()` / `is_empty()` - Registry inspection
 
-**Key Implementation Details:**
-- Adapter registry
-- `set_adapter()` / `get_adapter()` methods
-- Adapter merging utilities
-- Named adapter management
+---
 
-**Tasks:**
-- [ ] Create `src/registry.rs` module
-- [ ] Implement `AdapterRegistry` struct
-- [ ] Implement `register_adapter()` method
-- [ ] Implement `set_active_adapter()` method
-- [ ] Implement `get_adapter()` method
-- [ ] Implement adapter merging utilities
-- [ ] Add unit tests
-- [ ] Update documentation
+### 2.4 Training Utilities ✅ COMPLETED
+**Status:** ✅ Complete  
+**Tests:** 9 tests passing
+
+Implemented in `src/training.rs` with:
+- `LrSchedule` enum with strategies:
+  - `Constant` - Fixed learning rate
+  - `LinearWarmup { warmup_steps }` - Warmup from 0 to max LR
+  - `CosineAnnealing { total_steps, min_lr }` - Cosine decay
+  - `LinearDecay { total_steps, min_lr }` - Linear decay
+- `AdapterTrainingConfig` - Training configuration (LR, weight decay, gradient accumulation)
+- `AdapterTrainingState` - Training state management
+- `count_trainable_parameters()` - Count adapter parameters
+- `format_parameter_count()` - Human-readable parameter count (K/M/B)
 
 ---
 
