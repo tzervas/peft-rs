@@ -13,6 +13,11 @@ This document analyzes the gaps between the Rust `peft-rs` implementation and th
 | DoRA | ✅ Complete | Weight-Decomposed LoRA |
 | AdaLoRA | ✅ Complete | SVD-based adaptive rank allocation |
 | IA³ | ✅ Complete | Learned rescaling vectors |
+| LoHa | ✅ Complete | Low-Rank Hadamard Product |
+| LoKr | ✅ Complete | Low-Rank Kronecker Product |
+| OFT | ✅ Complete | Orthogonal Fine-Tuning |
+| BOFT | ✅ Complete | Butterfly Orthogonal Fine-Tuning |
+| VeRA | ✅ Complete | Vector-based Random Matrix Adaptation |
 | Prefix Tuning | ✅ Complete | Trainable prefix vectors |
 | Prompt Tuning | ✅ Complete | Soft prompt embeddings |
 

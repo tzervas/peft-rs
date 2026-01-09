@@ -1,6 +1,7 @@
 //! PEFT adapter implementations.
 
 pub mod adalora;
+pub mod boft;
 pub mod ia3;
 pub mod loha;
 pub mod lokr;

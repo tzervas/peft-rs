@@ -10,6 +10,7 @@
 //! - **LoHa** (Low-Rank Hadamard Product)
 //! - **LoKr** (Low-Rank Kronecker Product)
 //! - **OFT** (Orthogonal Fine-Tuning)
+//! - **BOFT** (Butterfly Orthogonal Fine-Tuning)
 //! - **VeRA** (Vector-based Random Matrix Adaptation)
 //! - **Prefix Tuning**
 //! - **Prompt Tuning**
@@ -49,6 +50,7 @@ pub mod registry;
 pub mod traits;
 
 pub use adapters::adalora::{AdaLoraConfig, AdaLoraLayer};
+pub use adapters::boft::{BoftConfig, BoftLayer};
 pub use adapters::ia3::{Ia3Config, Ia3Layer};
 pub use adapters::loha::{LoHaConfig, LoHaLayer};
 pub use adapters::lokr::{LoKrConfig, LoKrLayer};

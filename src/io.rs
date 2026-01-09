@@ -35,22 +35,19 @@ pub trait SaveLoad {
 /// - Failed to get state dict from adapter
 /// - Failed to serialize tensors to safetensors format
 /// - Failed to write file to disk
-pub fn save_adapter_weights<P: AsRef<Path>>(
-    adapter: &dyn SaveLoad,
-    path: P,
-) -> Result<()> {
+pub fn save_adapter_weights<P: AsRef<Path>>(adapter: &dyn SaveLoad, path: P) -> Result<()> {
     let state_dict = adapter.state_dict()?;
-    
+
     // Convert HashMap to Vec for safetensors
     let tensors: Vec<(&str, Tensor)> = state_dict
         .iter()
         .map(|(name, tensor)| (name.as_str(), tensor.clone()))
         .collect();
-    
+
     // Use candle's built-in safetensors serialization
     safetensors::tensor::serialize_to_file(tensors, &None, path.as_ref())
         .map_err(|e| PeftError::Io(format!("Failed to save safetensors: {e}")))?;
-    
+
     Ok(())
 }
 
@@ -73,10 +70,10 @@ pub fn load_adapter_weights<P: AsRef<Path>>(
 ) -> Result<()> {
     // Use candle's built-in safetensors loading
     let tensors = candle_core::safetensors::load(path.as_ref(), device)?;
-    
+
     // Load into adapter
     adapter.load_state_dict(tensors)?;
-    
+
     Ok(())
 }
 
@@ -88,16 +85,13 @@ pub fn load_adapter_weights<P: AsRef<Path>>(
 ///
 /// # Errors
 /// Returns an error if serialization or file writing fails
-pub fn save_adapter_config<T: Serialize, P: AsRef<Path>>(
-    config: &T,
-    path: P,
-) -> Result<()> {
+pub fn save_adapter_config<T: Serialize, P: AsRef<Path>>(config: &T, path: P) -> Result<()> {
     let json = serde_json::to_string_pretty(config)
         .map_err(|e| PeftError::Io(format!("Failed to serialize config: {e}")))?;
-    
+
     fs::write(path, json)
         .map_err(|e| PeftError::Io(format!("Failed to write config file: {e}")))?;
-    
+
     Ok(())
 }
 
@@ -108,15 +102,13 @@ pub fn save_adapter_config<T: Serialize, P: AsRef<Path>>(
 ///
 /// # Errors
 /// Returns an error if file reading or deserialization fails
-pub fn load_adapter_config<T: DeserializeOwned, P: AsRef<Path>>(
-    path: P,
-) -> Result<T> {
+pub fn load_adapter_config<T: DeserializeOwned, P: AsRef<Path>>(path: P) -> Result<T> {
     let json = fs::read_to_string(path)
         .map_err(|e| PeftError::Io(format!("Failed to read config file: {e}")))?;
-    
+
     let config = serde_json::from_str(&json)
         .map_err(|e| PeftError::Io(format!("Failed to parse config: {e}")))?;
-    
+
     Ok(config)
 }
 
@@ -177,7 +169,7 @@ mod tests {
         assert_eq!(loaded_adapter.weights.len(), 2);
         assert!(loaded_adapter.weights.contains_key("lora_a"));
         assert!(loaded_adapter.weights.contains_key("lora_b"));
-        
+
         // Verify shapes match
         assert_eq!(
             loaded_adapter.weights["lora_a"].dims(),
@@ -187,17 +179,29 @@ mod tests {
             loaded_adapter.weights["lora_b"].dims(),
             weights["lora_b"].dims()
         );
-        
+
         // Verify tensor values are preserved (compare sum as a simple check)
         let original_a_sum = weights["lora_a"].sum_all()?.to_scalar::<f32>()?;
-        let loaded_a_sum = loaded_adapter.weights["lora_a"].sum_all()?.to_scalar::<f32>()?;
-        assert!((original_a_sum - loaded_a_sum).abs() < 1e-5, 
-                "lora_a sum mismatch: {} vs {}", original_a_sum, loaded_a_sum);
-        
+        let loaded_a_sum = loaded_adapter.weights["lora_a"]
+            .sum_all()?
+            .to_scalar::<f32>()?;
+        assert!(
+            (original_a_sum - loaded_a_sum).abs() < 1e-5,
+            "lora_a sum mismatch: {} vs {}",
+            original_a_sum,
+            loaded_a_sum
+        );
+
         let original_b_sum = weights["lora_b"].sum_all()?.to_scalar::<f32>()?;
-        let loaded_b_sum = loaded_adapter.weights["lora_b"].sum_all()?.to_scalar::<f32>()?;
-        assert!((original_b_sum - loaded_b_sum).abs() < 1e-5,
-                "lora_b sum mismatch: {} vs {}", original_b_sum, loaded_b_sum);
+        let loaded_b_sum = loaded_adapter.weights["lora_b"]
+            .sum_all()?
+            .to_scalar::<f32>()?;
+        assert!(
+            (original_b_sum - loaded_b_sum).abs() < 1e-5,
+            "lora_b sum mismatch: {} vs {}",
+            original_b_sum,
+            loaded_b_sum
+        );
 
         Ok(())
     }

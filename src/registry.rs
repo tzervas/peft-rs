@@ -46,18 +46,18 @@ impl<A: Adapter> AdapterRegistry<A> {
     /// Returns an error if an adapter with this name already exists
     pub fn register_adapter(&mut self, name: impl Into<String>, adapter: A) -> Result<()> {
         let name = name.into();
-        
+
         if self.adapters.contains_key(&name) {
             return Err(PeftError::AdapterExists { name });
         }
-        
+
         self.adapters.insert(name.clone(), adapter);
-        
+
         // Set as active if it's the first adapter
         if self.active_adapter.is_none() {
             self.active_adapter = Some(name);
         }
-        
+
         Ok(())
     }
 
@@ -70,11 +70,11 @@ impl<A: Adapter> AdapterRegistry<A> {
     /// Returns an error if no adapter with this name exists
     pub fn set_active_adapter(&mut self, name: impl Into<String>) -> Result<()> {
         let name = name.into();
-        
+
         if !self.adapters.contains_key(&name) {
             return Err(PeftError::AdapterNotFound { name });
         }
-        
+
         self.active_adapter = Some(name);
         Ok(())
     }
@@ -84,12 +84,15 @@ impl<A: Adapter> AdapterRegistry<A> {
     /// # Errors
     /// Returns an error if no adapter is currently active
     pub fn get_active_adapter(&self) -> Result<&A> {
-        let name = self.active_adapter.as_ref()
+        let name = self
+            .active_adapter
+            .as_ref()
             .ok_or_else(|| PeftError::AdapterNotFound {
                 name: "no active adapter".to_string(),
             })?;
-        
-        self.adapters.get(name)
+
+        self.adapters
+            .get(name)
             .ok_or_else(|| PeftError::AdapterNotFound { name: name.clone() })
     }
 
@@ -98,13 +101,16 @@ impl<A: Adapter> AdapterRegistry<A> {
     /// # Errors
     /// Returns an error if no adapter is currently active
     pub fn get_active_adapter_mut(&mut self) -> Result<&mut A> {
-        let name = self.active_adapter.as_ref()
+        let name = self
+            .active_adapter
+            .as_ref()
             .ok_or_else(|| PeftError::AdapterNotFound {
                 name: "no active adapter".to_string(),
             })?
             .clone();
-        
-        self.adapters.get_mut(&name)
+
+        self.adapters
+            .get_mut(&name)
             .ok_or_else(|| PeftError::AdapterNotFound { name })
     }
 
@@ -116,8 +122,11 @@ impl<A: Adapter> AdapterRegistry<A> {
     /// # Errors
     /// Returns an error if no adapter with this name exists
     pub fn get_adapter(&self, name: &str) -> Result<&A> {
-        self.adapters.get(name)
-            .ok_or_else(|| PeftError::AdapterNotFound { name: name.to_string() })
+        self.adapters
+            .get(name)
+            .ok_or_else(|| PeftError::AdapterNotFound {
+                name: name.to_string(),
+            })
     }
 
     /// Get a mutable reference to an adapter by name.
@@ -128,8 +137,11 @@ impl<A: Adapter> AdapterRegistry<A> {
     /// # Errors
     /// Returns an error if no adapter with this name exists
     pub fn get_adapter_mut(&mut self, name: &str) -> Result<&mut A> {
-        self.adapters.get_mut(name)
-            .ok_or_else(|| PeftError::AdapterNotFound { name: name.to_string() })
+        self.adapters
+            .get_mut(name)
+            .ok_or_else(|| PeftError::AdapterNotFound {
+                name: name.to_string(),
+            })
     }
 
     /// Check if an adapter with the given name exists.
@@ -179,7 +191,7 @@ impl<A: Adapter> AdapterRegistry<A> {
                 "Cannot remove the currently active adapter".to_string(),
             ));
         }
-        
+
         Ok(self.adapters.remove(name))
     }
 
@@ -228,19 +240,19 @@ mod tests {
         let mut registry = AdapterRegistry::new();
         let device = Device::Cpu;
         let config = LoraConfig::default();
-        
+
         let adapter1 = LoraLayer::new_with_zeros(768, 768, config.clone(), &device)?;
         let adapter2 = LoraLayer::new_with_zeros(768, 768, config, &device)?;
-        
+
         registry.register_adapter("adapter1", adapter1)?;
         assert_eq!(registry.len(), 1);
         assert_eq!(registry.active_adapter_name(), Some("adapter1"));
-        
+
         registry.register_adapter("adapter2", adapter2)?;
         assert_eq!(registry.len(), 2);
         // Active adapter should still be adapter1
         assert_eq!(registry.active_adapter_name(), Some("adapter1"));
-        
+
         Ok(())
     }
 
@@ -249,16 +261,19 @@ mod tests {
         let mut registry = AdapterRegistry::new();
         let device = Device::Cpu;
         let config = LoraConfig::default();
-        
+
         let adapter1 = LoraLayer::new_with_zeros(768, 768, config.clone(), &device)?;
         let adapter2 = LoraLayer::new_with_zeros(768, 768, config, &device)?;
-        
+
         registry.register_adapter("adapter1", adapter1)?;
         let result = registry.register_adapter("adapter1", adapter2);
-        
+
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), PeftError::AdapterExists { .. }));
-        
+        assert!(matches!(
+            result.unwrap_err(),
+            PeftError::AdapterExists { .. }
+        ));
+
         Ok(())
     }
 
@@ -267,18 +282,18 @@ mod tests {
         let mut registry = AdapterRegistry::new();
         let device = Device::Cpu;
         let config = LoraConfig::default();
-        
+
         let adapter1 = LoraLayer::new_with_zeros(768, 768, config.clone(), &device)?;
         let adapter2 = LoraLayer::new_with_zeros(768, 768, config, &device)?;
-        
+
         registry.register_adapter("adapter1", adapter1)?;
         registry.register_adapter("adapter2", adapter2)?;
-        
+
         assert_eq!(registry.active_adapter_name(), Some("adapter1"));
-        
+
         registry.set_active_adapter("adapter2")?;
         assert_eq!(registry.active_adapter_name(), Some("adapter2"));
-        
+
         Ok(())
     }
 
@@ -287,14 +302,17 @@ mod tests {
         let mut registry = AdapterRegistry::new();
         let device = Device::Cpu;
         let config = LoraConfig::default();
-        
+
         let adapter1 = LoraLayer::new_with_zeros(768, 768, config, &device)?;
         registry.register_adapter("adapter1", adapter1)?;
-        
+
         let result = registry.set_active_adapter("nonexistent");
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), PeftError::AdapterNotFound { .. }));
-        
+        assert!(matches!(
+            result.unwrap_err(),
+            PeftError::AdapterNotFound { .. }
+        ));
+
         Ok(())
     }
 
@@ -303,13 +321,13 @@ mod tests {
         let mut registry = AdapterRegistry::new();
         let device = Device::Cpu;
         let config = LoraConfig::default();
-        
+
         let adapter1 = LoraLayer::new_with_zeros(768, 768, config, &device)?;
         registry.register_adapter("adapter1", adapter1)?;
-        
+
         let retrieved = registry.get_adapter("adapter1")?;
         assert_eq!(retrieved.num_parameters(), 768 * 8 + 8 * 768);
-        
+
         Ok(())
     }
 
@@ -318,13 +336,13 @@ mod tests {
         let mut registry = AdapterRegistry::new();
         let device = Device::Cpu;
         let config = LoraConfig::default();
-        
+
         let adapter1 = LoraLayer::new_with_zeros(768, 768, config, &device)?;
         registry.register_adapter("adapter1", adapter1)?;
-        
+
         let active = registry.get_active_adapter()?;
         assert_eq!(active.num_parameters(), 768 * 8 + 8 * 768);
-        
+
         Ok(())
     }
 
@@ -333,13 +351,13 @@ mod tests {
         let mut registry = AdapterRegistry::new();
         let device = Device::Cpu;
         let config = LoraConfig::default();
-        
+
         let adapter1 = LoraLayer::new_with_zeros(768, 768, config, &device)?;
         registry.register_adapter("adapter1", adapter1)?;
-        
+
         assert!(registry.contains_adapter("adapter1"));
         assert!(!registry.contains_adapter("adapter2"));
-        
+
         Ok(())
     }
 
@@ -348,17 +366,17 @@ mod tests {
         let mut registry = AdapterRegistry::new();
         let device = Device::Cpu;
         let config = LoraConfig::default();
-        
+
         let adapter1 = LoraLayer::new_with_zeros(768, 768, config.clone(), &device)?;
         let adapter2 = LoraLayer::new_with_zeros(768, 768, config, &device)?;
-        
+
         registry.register_adapter("adapter1", adapter1)?;
         registry.register_adapter("adapter2", adapter2)?;
-        
+
         let mut names = registry.adapter_names();
         names.sort();
         assert_eq!(names, vec!["adapter1", "adapter2"]);
-        
+
         Ok(())
     }
 
@@ -367,22 +385,22 @@ mod tests {
         let mut registry = AdapterRegistry::new();
         let device = Device::Cpu;
         let config = LoraConfig::default();
-        
+
         let adapter1 = LoraLayer::new_with_zeros(768, 768, config.clone(), &device)?;
         let adapter2 = LoraLayer::new_with_zeros(768, 768, config, &device)?;
-        
+
         registry.register_adapter("adapter1", adapter1)?;
         registry.register_adapter("adapter2", adapter2)?;
-        
+
         // Can remove non-active adapter
         let removed = registry.remove_adapter("adapter2")?;
         assert!(removed.is_some());
         assert_eq!(registry.len(), 1);
-        
+
         // Cannot remove active adapter
         let result = registry.remove_adapter("adapter1");
         assert!(result.is_err());
-        
+
         Ok(())
     }
 
@@ -391,34 +409,34 @@ mod tests {
         let mut registry = AdapterRegistry::new();
         let device = Device::Cpu;
         let config = LoraConfig::default();
-        
+
         let adapter1 = LoraLayer::new_with_zeros(768, 768, config, &device)?;
         registry.register_adapter("adapter1", adapter1)?;
-        
+
         assert_eq!(registry.len(), 1);
         registry.clear();
         assert_eq!(registry.len(), 0);
         assert!(registry.active_adapter_name().is_none());
-        
+
         Ok(())
     }
 
     #[test]
     fn test_forward_with_active_adapter() -> Result<()> {
         use candle_core::{DType, Tensor};
-        
+
         let mut registry = AdapterRegistry::new();
         let device = Device::Cpu;
         let config = LoraConfig::default();
-        
+
         let adapter = LoraLayer::new_with_zeros(768, 768, config, &device)?;
         registry.register_adapter("test_adapter", adapter)?;
-        
+
         let input = Tensor::zeros(&[1, 10, 768], DType::F32, &device)?;
         let output = registry.forward(&input, None)?;
-        
+
         assert_eq!(output.shape().dims(), &[1, 10, 768]);
-        
+
         Ok(())
     }
 }

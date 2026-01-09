@@ -120,9 +120,7 @@ impl AdapterConfig for AdaLoraConfig {
             ));
         }
         if self.total_step == 0 {
-            return Err(PeftError::InvalidConfig(
-                "total_step must be > 0".into(),
-            ));
+            return Err(PeftError::InvalidConfig("total_step must be > 0".into()));
         }
         if self.tinit >= self.total_step.saturating_sub(self.tfinal) {
             return Err(PeftError::InvalidConfig(
@@ -202,7 +200,7 @@ impl AdaLoraLayer {
 
         // Initialize rank mask to all ones (all ranks active)
         let rank_mask = Tensor::ones(config.init_r, dtype, device)?;
-        
+
         let init_r = config.init_r;
 
         Ok(Self {
@@ -252,14 +250,16 @@ impl AdaLoraLayer {
         // Get the indices of top-k importance scores
         // For simplicity, we'll create a mask based on a threshold
         // In practice, this would involve sorting and selecting top-k
-        
+
         if budget >= self.config.init_r {
             // Keep all ranks
-            self.rank_mask = Tensor::ones(self.config.init_r, DType::F32, importance_scores.device())?;
+            self.rank_mask =
+                Tensor::ones(self.config.init_r, DType::F32, importance_scores.device())?;
             self.current_rank = self.config.init_r;
         } else if budget == 0 {
             // Zero out all ranks
-            self.rank_mask = Tensor::zeros(self.config.init_r, DType::F32, importance_scores.device())?;
+            self.rank_mask =
+                Tensor::zeros(self.config.init_r, DType::F32, importance_scores.device())?;
             self.current_rank = 0;
         } else {
             // Sort importance scores and keep top budget
@@ -267,17 +267,17 @@ impl AdaLoraLayer {
             let scores = importance_scores.flatten_all()?;
             let mean_score = scores.mean_all()?;
             let mean: f32 = mean_score.to_scalar()?;
-            
+
             // Simple threshold-based approach
             let threshold = Tensor::new(mean, importance_scores.device())?;
             let mask = importance_scores.ge(&threshold)?;
             self.rank_mask = mask.to_dtype(DType::F32)?;
-            
+
             // Update current rank (count non-zero elements)
             let sum: f32 = self.rank_mask.sum_all()?.to_scalar()?;
             self.current_rank = sum as usize;
         }
-        
+
         Ok(())
     }
 
@@ -315,31 +315,31 @@ impl Adapter for AdaLoraLayer {
         // Input shape: [batch, seq, in_features]
         // B shape: [init_r, in_features], B^T shape: [in_features, init_r]
         // A shape: [out_features, init_r], A^T shape: [init_r, out_features]
-        
+
         // For batched matmul, we need to handle the 3D tensor
         // Use the last dimension for matmul
         let input_dims = input.dims();
-        
+
         // First: input @ B^T -> [batch, seq, init_r]
         // Reshape input to [batch*seq, in_features] for matmul
         let batch_seq = input_dims[0] * input_dims[1];
         let input_2d = input.reshape((batch_seq, self.in_features))?;
-        
+
         // Compute input_2d @ B^T = [batch*seq, in_features] @ [in_features, init_r] = [batch*seq, init_r]
         let out = input_2d.matmul(&self.lora_b.t()?)?;
-        
+
         // Apply singular values with mask: [batch*seq, init_r] * [init_r]
         let masked_e = self.lora_e.broadcast_mul(&self.rank_mask)?;
         let masked_e = masked_e.reshape((1, self.config.init_r))?;
         let out = out.broadcast_mul(&masked_e)?;
-        
+
         // Then: @ A^T -> [batch*seq, out_features]
         // A^T shape: [init_r, out_features]
         let out = out.matmul(&self.lora_a.t()?)?;
-        
+
         // Reshape back to [batch, seq, out_features]
         let out = out.reshape((input_dims[0], input_dims[1], self.out_features))?;
-        
+
         // Apply scaling
         let scaling = Tensor::new(self.scaling as f32, out.device())?;
         let out = out.broadcast_mul(&scaling)?;
@@ -355,8 +355,8 @@ impl Adapter for AdaLoraLayer {
         // A: out_features × init_r
         // E: init_r
         // B: init_r × in_features
-        self.out_features * self.config.init_r 
-            + self.config.init_r 
+        self.out_features * self.config.init_r
+            + self.config.init_r
             + self.config.init_r * self.in_features
     }
 
@@ -370,14 +370,14 @@ impl Mergeable for AdaLoraLayer {
         // ΔW = A @ diag(E * mask) @ B * scaling
         // Apply mask to singular values
         let masked_e = self.lora_e.broadcast_mul(&self.rank_mask)?;
-        
+
         // Compute A @ diag(E) = A * E (broadcast along columns)
         let masked_e_col = masked_e.reshape((self.config.init_r, 1))?;
         let ae = self.lora_a.broadcast_mul(&masked_e_col.t()?)?;
-        
+
         // Then @ B
         let delta_w = ae.matmul(&self.lora_b)?;
-        
+
         // Apply scaling
         let scaling = Tensor::new(self.scaling as f32, delta_w.device())?;
         let delta_w = delta_w.broadcast_mul(&scaling)?;
@@ -387,11 +387,11 @@ impl Mergeable for AdaLoraLayer {
 
     fn unmerge(&self, merged_weight: &Tensor) -> Result<Tensor> {
         let masked_e = self.lora_e.broadcast_mul(&self.rank_mask)?;
-        
+
         let masked_e_col = masked_e.reshape((self.config.init_r, 1))?;
         let ae = self.lora_a.broadcast_mul(&masked_e_col.t()?)?;
         let delta_w = ae.matmul(&self.lora_b)?;
-        
+
         let scaling = Tensor::new(self.scaling as f32, delta_w.device())?;
         let delta_w = delta_w.broadcast_mul(&scaling)?;
 
@@ -460,7 +460,7 @@ mod tests {
         let device = Device::Cpu;
         let layer = AdaLoraLayer::new(768, 768, config, &device);
         assert!(layer.is_ok());
-        
+
         let layer = layer.unwrap();
         assert_eq!(layer.init_rank(), 12);
         assert_eq!(layer.target_rank(), 8);
@@ -472,10 +472,10 @@ mod tests {
         let config = AdaLoraConfig::default();
         let device = Device::Cpu;
         let layer = AdaLoraLayer::new(768, 768, config, &device).unwrap();
-        
+
         let input = Tensor::zeros(&[1, 10, 768], DType::F32, &device).unwrap();
         let output = layer.forward(&input, None).unwrap();
-        
+
         assert_eq!(output.shape().dims(), &[1, 10, 768]);
     }
 
@@ -487,7 +487,7 @@ mod tests {
         };
         let device = Device::Cpu;
         let layer = AdaLoraLayer::new(768, 768, config, &device).unwrap();
-        
+
         // A: 768 × 12 = 9216
         // E: 12
         // B: 12 × 768 = 9216
@@ -500,7 +500,7 @@ mod tests {
         let config = AdaLoraConfig::default();
         let device = Device::Cpu;
         let layer = AdaLoraLayer::new(768, 768, config, &device).unwrap();
-        
+
         let scores = layer.get_importance_scores().unwrap();
         assert_eq!(scores.dims(), &[12]);
     }
@@ -510,7 +510,7 @@ mod tests {
         let config = AdaLoraConfig::default();
         let device = Device::Cpu;
         let layer = AdaLoraLayer::new(64, 64, config, &device).unwrap();
-        
+
         let orth_loss = layer.orthogonal_regularization().unwrap();
         // Should be a scalar tensor (0-dimensional)
         assert!(orth_loss.dims().is_empty());
