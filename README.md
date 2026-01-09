@@ -107,6 +107,51 @@ fn main() -> anyhow::Result<()> {
 }
 ```
 
+## Saving and Loading Adapters
+
+Adapters can be saved and loaded using safetensors format:
+
+```rust
+use peft_rs::{LoraLayer, save_adapter_weights, load_adapter_weights, save_adapter_config, load_adapter_config};
+
+// Save adapter weights and config
+save_adapter_weights(&lora_layer, "adapter_weights.safetensors")?;
+save_adapter_config(&config, "adapter_config.json")?;
+
+// Load adapter weights and config
+let loaded_config = load_adapter_config("adapter_config.json")?;
+let mut loaded_layer = LoraLayer::new_with_zeros(768, 768, loaded_config, &device)?;
+load_adapter_weights(&mut loaded_layer, "adapter_weights.safetensors", &device)?;
+```
+
+## Multi-Adapter Support
+
+Manage multiple adapters and switch between them at runtime:
+
+```rust
+use peft_rs::{AdapterRegistry, LoraLayer, LoraConfig};
+
+// Create registry
+let mut registry = AdapterRegistry::new();
+
+// Register multiple adapters
+let task1_adapter = LoraLayer::new_with_zeros(768, 768, config1, &device)?;
+let task2_adapter = LoraLayer::new_with_zeros(768, 768, config2, &device)?;
+
+registry.register_adapter("task1", task1_adapter)?;
+registry.register_adapter("task2", task2_adapter)?;
+
+// Switch between adapters
+registry.set_active_adapter("task1")?;
+let output1 = registry.forward(&input, None)?;
+
+registry.set_active_adapter("task2")?;
+let output2 = registry.forward(&input, None)?;
+
+// Access specific adapters
+let task1 = registry.get_adapter("task1")?;
+```
+
 ## Architecture
 
 All adapters implement common traits for consistent usage:
@@ -142,6 +187,8 @@ pub trait Mergeable: Adapter {
 | Prompt Tuning | ✅ | ✅ |
 | BOFT | 🚧 | ✅ |
 | Weight merging | ✅ | ✅ |
+| Weight saving/loading | ✅ | ✅ |
+| Multi-adapter support | ✅ | ✅ |
 | CUDA support | ✅ | ✅ |
 | No Python runtime | ✅ | ❌ |
 
