@@ -17,22 +17,22 @@ use crate::traits::{Adapter, AdapterConfig, Mergeable, Trainable};
 pub struct LoraConfig {
     /// Rank of the low-rank decomposition.
     pub r: usize,
-    
+
     /// Scaling factor (typically `alpha / r`).
     pub alpha: usize,
-    
+
     /// Dropout probability applied to LoRA outputs.
     #[serde(default)]
     pub dropout: f64,
-    
+
     /// Target modules to apply LoRA to.
     #[serde(default = "default_target_modules")]
     pub target_modules: Vec<String>,
-    
+
     /// Initialize A with Gaussian, B with zeros (standard) or vice versa.
     #[serde(default)]
     pub init_lora_weights: LoraInitialization,
-    
+
     /// Enable DoRA (Weight-Decomposed Low-Rank Adaptation).
     /// When enabled, the weight update is decomposed into magnitude and direction.
     #[serde(default)]
@@ -126,7 +126,7 @@ impl LoraLayer {
 
         // A: in_features → r (initialized with small random values)
         let lora_a = linear_no_bias(in_features, config.r, vb.pp("lora_a"))?;
-        
+
         // B: r → out_features (initialized to zeros for standard init)
         let lora_b = linear_no_bias(config.r, out_features, vb.pp("lora_b"))?;
 
@@ -162,7 +162,7 @@ impl LoraLayer {
         // Initialize A with small random values (Kaiming uniform)
         let std = (1.0 / in_features as f64).sqrt();
         let a_weight = Tensor::randn(0.0f32, std as f32, (config.r, in_features), device)?;
-        
+
         // Initialize B with zeros
         let b_weight = Tensor::zeros((out_features, config.r), dtype, device)?;
 
@@ -225,22 +225,22 @@ impl Mergeable for LoraLayer {
         // merged = W + ΔW
         let a_weight = self.lora_a.weight();
         let b_weight = self.lora_b.weight();
-        
+
         let delta_w = b_weight.matmul(a_weight)?;
         let scaling = Tensor::new(self.scaling as f32, delta_w.device())?;
         let delta_w = delta_w.broadcast_mul(&scaling)?;
-        
+
         Ok(base_weight.broadcast_add(&delta_w)?)
     }
 
     fn unmerge(&self, merged_weight: &Tensor) -> Result<Tensor> {
         let a_weight = self.lora_a.weight();
         let b_weight = self.lora_b.weight();
-        
+
         let delta_w = b_weight.matmul(a_weight)?;
         let scaling = Tensor::new(self.scaling as f32, delta_w.device())?;
         let delta_w = delta_w.broadcast_mul(&scaling)?;
-        
+
         Ok(merged_weight.broadcast_sub(&delta_w)?)
     }
 }
@@ -302,7 +302,7 @@ impl DoraLayer {
     ) -> Result<Self> {
         // Create the underlying LoRA layer
         let lora = LoraLayer::new_with_zeros(in_features, out_features, config, device)?;
-        
+
         // Initialize magnitude vector
         // If base_weight is provided, initialize from column norms
         // Otherwise, initialize to ones
@@ -312,7 +312,7 @@ impl DoraLayer {
         } else {
             Tensor::ones(out_features, DType::F32, device)?
         };
-        
+
         Ok(Self {
             lora,
             magnitude,
@@ -346,19 +346,19 @@ impl DoraLayer {
         let delta_w = b_weight.matmul(a_weight)?;
         let scaling = Tensor::new(self.lora.scaling as f32, delta_w.device())?;
         let delta_w = delta_w.broadcast_mul(&scaling)?;
-        
+
         // W + ΔW
         let combined = base_weight.broadcast_add(&delta_w)?;
-        
+
         // Compute column-wise L2 norm
         let norms = combined.sqr()?.sum(1)?.sqrt()?;
         let norms = norms.reshape((self.lora.out_features, 1))?;
-        
+
         // Normalize: (W + ΔW) / ||W + ΔW||
         // Add small epsilon to avoid division by zero
         let epsilon = Tensor::new(1e-8_f32, norms.device())?;
         let safe_norms = norms.broadcast_add(&epsilon)?;
-        
+
         Ok(combined.broadcast_div(&safe_norms)?)
     }
 }
@@ -372,23 +372,23 @@ impl Adapter for DoraLayer {
         if let (Some(base_weight), Some(_base_out)) = (&self.base_weight, base_output) {
             // Compute the directional component
             let direction = self.compute_direction(base_weight)?;
-            
+
             // Compute the output through the normalized, magnitude-scaled weight
             // output = input @ (m * direction)^T
             let input_dims = input.dims();
             let batch_seq = input_dims[0] * input_dims[1];
             let input_2d = input.reshape((batch_seq, self.lora.in_features))?;
-            
+
             // Apply: input @ direction^T
             let out = input_2d.matmul(&direction.t()?)?;
-            
+
             // Scale by magnitude
             let mag_2d = self.magnitude.reshape((1, self.lora.out_features))?;
             let out = out.broadcast_mul(&mag_2d)?;
-            
+
             // Reshape back
             let out = out.reshape((input_dims[0], input_dims[1], self.lora.out_features))?;
-            
+
             // Note: The base output difference needs to be accounted for
             // This is a simplified version; full DoRA requires careful handling
             Ok(out)
@@ -413,7 +413,7 @@ impl Mergeable for DoraLayer {
         // For DoRA merge:
         // W' = m * (W + ΔW) / ||W + ΔW||
         let direction = self.compute_direction(base_weight)?;
-        
+
         // Apply magnitude
         let mag = self.magnitude.reshape((self.lora.out_features, 1))?;
         Ok(direction.broadcast_mul(&mag)?)
@@ -425,10 +425,10 @@ impl Mergeable for DoraLayer {
         let mag = self.magnitude.reshape((self.lora.out_features, 1))?;
         let epsilon = Tensor::new(1e-8_f32, mag.device())?;
         let safe_mag = mag.broadcast_add(&epsilon)?;
-        
+
         // Undo magnitude scaling
         let _direction = merged_weight.broadcast_div(&safe_mag)?;
-        
+
         // The direction should approximately equal (W + ΔW) / ||W + ΔW||
         // Recovering W requires knowing ΔW, which we can compute
         let a_weight = self.lora.lora_a.weight();
@@ -436,7 +436,7 @@ impl Mergeable for DoraLayer {
         let delta_w = b_weight.matmul(a_weight)?;
         let scaling = Tensor::new(self.lora.scaling as f32, delta_w.device())?;
         let delta_w = delta_w.broadcast_mul(&scaling)?;
-        
+
         // Approximate: W ≈ direction * ||W + ΔW|| - ΔW
         // This is a rough approximation since we don't store the exact norms
         if let Some(base_weight) = &self.base_weight {
@@ -469,21 +469,24 @@ impl Trainable for DoraLayer {
 impl crate::io::SaveLoad for LoraLayer {
     fn state_dict(&self) -> Result<std::collections::HashMap<String, Tensor>> {
         use std::collections::HashMap;
-        
+
         let mut state_dict = HashMap::new();
-        
+
         // Get lora_a weight
         let lora_a_weight = self.lora_a.weight();
         state_dict.insert("lora_a.weight".to_string(), lora_a_weight.clone());
-        
+
         // Get lora_b weight
         let lora_b_weight = self.lora_b.weight();
         state_dict.insert("lora_b.weight".to_string(), lora_b_weight.clone());
-        
+
         Ok(state_dict)
     }
 
-    fn load_state_dict(&mut self, state_dict: std::collections::HashMap<String, Tensor>) -> Result<()> {
+    fn load_state_dict(
+        &mut self,
+        state_dict: std::collections::HashMap<String, Tensor>,
+    ) -> Result<()> {
         // TODO: This is a placeholder implementation that only validates tensor shapes.
         // Actual weight loading is not yet implemented because candle_nn::Linear doesn't
         // provide a way to update weights after construction. A future PR will implement
@@ -494,31 +497,31 @@ impl crate::io::SaveLoad for LoraLayer {
         // 1. Validates that required keys exist in the state dict
         // 2. Verifies that tensor shapes match the expected dimensions
         // 3. Returns success if validation passes (weights are not actually loaded)
-        
+
         if !state_dict.contains_key("lora_a.weight") || !state_dict.contains_key("lora_b.weight") {
             return Err(PeftError::WeightLoad(
-                "Missing required keys in state_dict".to_string()
+                "Missing required keys in state_dict".to_string(),
             ));
         }
-        
+
         // Verify shapes match
         let lora_a_shape = state_dict["lora_a.weight"].dims();
         let lora_b_shape = state_dict["lora_b.weight"].dims();
-        
+
         if lora_a_shape != &[self.config.r, self.in_features] {
             return Err(PeftError::ShapeMismatch {
                 expected: vec![self.config.r, self.in_features],
                 actual: lora_a_shape.to_vec(),
             });
         }
-        
+
         if lora_b_shape != &[self.out_features, self.config.r] {
             return Err(PeftError::ShapeMismatch {
                 expected: vec![self.out_features, self.config.r],
                 actual: lora_b_shape.to_vec(),
             });
         }
-        
+
         Ok(())
     }
 }
@@ -558,10 +561,10 @@ mod tests {
         let config = LoraConfig::default();
         let device = Device::Cpu;
         let layer = LoraLayer::new_with_zeros(768, 768, config, &device).unwrap();
-        
+
         let input = Tensor::zeros(&[1, 10, 768], DType::F32, &device).unwrap();
         let output = layer.forward(&input, None).unwrap();
-        
+
         assert_eq!(output.shape().dims(), &[1, 10, 768]);
     }
 
@@ -574,7 +577,7 @@ mod tests {
         };
         let device = Device::Cpu;
         let layer = LoraLayer::new_with_zeros(768, 768, config, &device).unwrap();
-        
+
         // r * (in + out) = 8 * (768 + 768) = 12288
         assert_eq!(layer.num_parameters(), 12288);
     }
@@ -600,7 +603,7 @@ mod tests {
         let base_weight = Tensor::randn(0.0f32, 0.02, (768, 768), &device).unwrap();
         let layer = DoraLayer::new(768, 768, config, &device, Some(&base_weight));
         assert!(layer.is_ok());
-        
+
         let layer = layer.unwrap();
         // Magnitude should be initialized from base weight norms
         assert_eq!(layer.magnitude().dims(), &[768]);
@@ -615,7 +618,7 @@ mod tests {
         };
         let device = Device::Cpu;
         let layer = DoraLayer::new(768, 768, config, &device, None).unwrap();
-        
+
         // LoRA params + magnitude vector = 12288 + 768 = 13056
         assert_eq!(layer.num_parameters(), 12288 + 768);
     }
@@ -629,40 +632,40 @@ mod tests {
         };
         let device = Device::Cpu;
         let layer = DoraLayer::new(768, 768, config, &device, None).unwrap();
-        
+
         let input = Tensor::zeros(&[1, 10, 768], DType::F32, &device).unwrap();
         let output = layer.forward(&input, None).unwrap();
-        
+
         assert_eq!(output.shape().dims(), &[1, 10, 768]);
     }
 
     #[test]
     fn test_lora_save_load_weights() -> Result<()> {
-        use crate::io::{save_adapter_weights, load_adapter_weights, SaveLoad};
+        use crate::io::{load_adapter_weights, save_adapter_weights, SaveLoad};
         use tempfile::TempDir;
-        
+
         let device = Device::Cpu;
         let config = LoraConfig::default();
         let layer = LoraLayer::new_with_zeros(768, 768, config.clone(), &device)?;
-        
+
         // Create temp directory for test
         let temp_dir = TempDir::new().map_err(|e| PeftError::Io(e.to_string()))?;
         let weights_path = temp_dir.path().join("lora_weights.safetensors");
-        
+
         // Get original state dict for comparison
         let original_state = layer.state_dict()?;
         assert_eq!(original_state.len(), 2);
         assert!(original_state.contains_key("lora_a.weight"));
         assert!(original_state.contains_key("lora_b.weight"));
-        
+
         // Save weights
         save_adapter_weights(&layer, &weights_path)?;
         assert!(weights_path.exists());
-        
+
         // Load weights into new layer
         let mut loaded_layer = LoraLayer::new_with_zeros(768, 768, config, &device)?;
         load_adapter_weights(&mut loaded_layer, &weights_path, &device)?;
-        
+
         // Verify the loaded layer's state dict has the same keys and shapes
         let loaded_state = loaded_layer.state_dict()?;
         assert_eq!(loaded_state.len(), original_state.len());
@@ -674,12 +677,12 @@ mod tests {
             loaded_state["lora_b.weight"].dims(),
             original_state["lora_b.weight"].dims()
         );
-        
+
         // Note: We don't compare actual tensor values here because the current
         // load_state_dict implementation doesn't actually load weights into the
         // Linear layers (see TODO in load_state_dict implementation).
         // A future PR will implement full weight loading functionality.
-        
+
         Ok(())
     }
 }

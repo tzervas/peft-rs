@@ -119,11 +119,7 @@ impl VeraLayer {
         let vera_b = Tensor::zeros((out_features, config.r), candle_core::DType::F32, device)?;
 
         // Initialize trainable scaling vector d
-        let vera_d = Tensor::full(
-            config.d_initial as f32,
-            config.r,
-            device,
-        )?;
+        let vera_d = Tensor::full(config.d_initial as f32, config.r, device)?;
 
         Ok(Self {
             vera_a,
@@ -151,7 +147,11 @@ impl VeraLayer {
         device: &Device,
     ) -> Result<Self> {
         let mut layer = Self::new(in_features, out_features, config, device)?;
-        layer.vera_b_bias = Some(Tensor::zeros(out_features, candle_core::DType::F32, device)?);
+        layer.vera_b_bias = Some(Tensor::zeros(
+            out_features,
+            candle_core::DType::F32,
+            device,
+        )?);
         Ok(layer)
     }
 
@@ -301,7 +301,7 @@ mod tests {
         let device = Device::Cpu;
         let layer = VeraLayer::new_with_bias(768, 768, config, &device);
         assert!(layer.is_ok());
-        
+
         let layer = layer.unwrap();
         assert!(layer.vera_b_bias.is_some());
     }
@@ -417,7 +417,7 @@ mod tests {
         // VeRA: only 64 trainable params (the d vector)
         // LoRA with r=64: 64 * 768 + 64 * 768 = 98,304 params
         assert_eq!(layer.num_parameters(), 64);
-        
+
         // That's ~1500x fewer parameters than equivalent LoRA!
         let lora_equivalent_params = 64 * (768 + 768);
         assert!(layer.num_parameters() < lora_equivalent_params / 1000);

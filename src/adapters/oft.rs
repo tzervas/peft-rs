@@ -36,10 +36,10 @@ pub struct OftConfig {
     pub target_modules: Vec<String>,
 
     /// Whether to use exact Cayley transform computation.
-    /// 
+    ///
     /// When `false` (default), uses a Neumann series approximation `(I + Q)^{-1} ≈ I - Q + Q^2`
     /// which is efficient but less accurate for larger Q values.
-    /// 
+    ///
     /// When `true`, computes the exact inverse using Newton-Schulz iteration,
     /// providing higher accuracy at the cost of additional computation.
     #[serde(default)]
@@ -161,7 +161,7 @@ impl OftLayer {
 
     /// Compute the orthogonal matrix using Cayley transform.
     /// R = (I - Q) @ (I + Q)^{-1}
-    /// 
+    ///
     /// Uses either exact computation or Neumann series approximation based on config.
     fn compute_orthogonal_matrix(&self) -> Result<Tensor> {
         let q = self.make_skew_symmetric()?;
@@ -169,7 +169,9 @@ impl OftLayer {
 
         // Create block-diagonal identity
         let eye = Tensor::eye(self.block_size, candle_core::DType::F32, device)?;
-        let eye = eye.unsqueeze(0)?.expand((self.num_blocks, self.block_size, self.block_size))?;
+        let eye = eye
+            .unsqueeze(0)?
+            .expand((self.num_blocks, self.block_size, self.block_size))?;
 
         // I - Q
         let i_minus_q = eye.broadcast_sub(&q)?;
@@ -178,17 +180,17 @@ impl OftLayer {
         let i_plus_q = eye.broadcast_add(&q)?;
 
         let mut result_blocks = Vec::with_capacity(self.num_blocks);
-        
+
         for block_idx in 0..self.num_blocks {
             let i_minus_q_block = i_minus_q.i(block_idx)?;
             let i_plus_q_block = i_plus_q.i(block_idx)?;
             let q_block = q.i(block_idx)?;
-            
+
             let inv = if self.config.use_exact_cayley {
                 // Exact method: Compute (I + Q)^{-1} using iterative refinement
                 // Since Q is small (initialized with std=0.01), we use Newton-Schulz iteration
                 // which converges quickly for matrices close to identity.
-                // 
+                //
                 // Newton-Schulz iteration: X_{k+1} = X_k @ (2I - (I+Q) @ X_k)
                 // Starting with X_0 = I (good initial guess since I+Q ≈ I)
                 self.compute_exact_inverse(&i_plus_q_block)?
@@ -199,7 +201,7 @@ impl OftLayer {
                 let q_sq = q_block.matmul(&q_block)?;
                 eye_block.broadcast_sub(&q_block)?.broadcast_add(&q_sq)?
             };
-            
+
             // R_block = (I - Q) @ (I + Q)^{-1}
             let r_block = i_minus_q_block.matmul(&inv)?;
             result_blocks.push(r_block);
@@ -210,11 +212,11 @@ impl OftLayer {
     }
 
     /// Compute exact inverse using Newton-Schulz iteration.
-    /// 
+    ///
     /// Newton-Schulz iteration: X_{k+1} = X_k @ (2I - A @ X_k)
     /// Converges for matrices A with ||I - A|| < 1, which is satisfied
     /// since (I + Q) is close to identity for small Q (initialized with std=0.01).
-    /// 
+    ///
     /// # Iteration Count
     /// Uses 5 iterations which provides accuracy to approximately 1e-10 for well-conditioned
     /// matrices close to identity. This is sufficient since:
@@ -226,10 +228,10 @@ impl OftLayer {
         let eye = Tensor::eye(self.block_size, candle_core::DType::F32, device)?;
         let two = Tensor::new(2.0f32, device)?;
         let two_eye = eye.broadcast_mul(&two)?;
-        
+
         // Start with identity as initial guess (good for matrices close to I)
         let mut x = eye.clone();
-        
+
         // Newton-Schulz iterations: 5 iterations provides ~1e-10 accuracy for matrices
         // close to identity, which is the case here since Q is initialized with small values.
         const NUM_ITERATIONS: usize = 5;
@@ -239,7 +241,7 @@ impl OftLayer {
             let factor = two_eye.broadcast_sub(&ax)?;
             x = x.matmul(&factor)?;
         }
-        
+
         Ok(x)
     }
 
@@ -247,25 +249,25 @@ impl OftLayer {
     fn apply_block_diagonal(&self, input: &Tensor, orth_matrix: &Tensor) -> Result<Tensor> {
         let input_dims = input.dims();
         let batch_seq = input_dims[0] * input_dims[1];
-        
+
         // Reshape input to [batch*seq, num_blocks, block_size]
         let input_blocked = input.reshape((batch_seq, self.num_blocks, self.block_size))?;
-        
+
         // Apply orthogonal transformation to each block
         // input_blocked: [batch*seq, num_blocks, block_size]
         // orth_matrix: [num_blocks, block_size, block_size]
-        
+
         // For each block: output[b, n, :] = input[b, n, :] @ R[n, :, :]
         // We need batch matrix multiply
-        
+
         let mut output_blocks = Vec::with_capacity(self.num_blocks);
-        
+
         for block_idx in 0..self.num_blocks {
             // input_block: [batch*seq, block_size]
             let input_block = input_blocked.i((.., block_idx, ..))?;
             // orth_block: [block_size, block_size]
             let orth_block = orth_matrix.i(block_idx)?;
-            
+
             // output_block: [batch*seq, block_size]
             let output_block = input_block.matmul(&orth_block)?;
             output_blocks.push(output_block);
@@ -283,10 +285,10 @@ impl Adapter for OftLayer {
     fn forward(&self, input: &Tensor, base_output: Option<&Tensor>) -> Result<Tensor> {
         // Compute the orthogonal transformation matrix
         let orth_matrix = self.compute_orthogonal_matrix()?;
-        
+
         // Apply block-diagonal orthogonal transformation
         let transformed = self.apply_block_diagonal(input, &orth_matrix)?;
-        
+
         // For OFT, the transformation replaces the base output
         // If base_output provided, compute the difference (delta)
         match base_output {
@@ -315,10 +317,10 @@ impl Mergeable for OftLayer {
     fn merge(&self, base_weight: &Tensor) -> Result<Tensor> {
         // W' = W @ R (right multiply by orthogonal matrix)
         let orth_matrix = self.compute_orthogonal_matrix()?;
-        
+
         // Construct full block-diagonal matrix from blocks
         let full_orth = self.construct_full_matrix(&orth_matrix)?;
-        
+
         // base_weight: [out_features, in_features]
         // full_orth: [in_features, in_features]
         Ok(base_weight.matmul(&full_orth)?)
@@ -328,10 +330,10 @@ impl Mergeable for OftLayer {
         // W = W' @ R^T (R is orthogonal, so R^{-1} = R^T)
         let orth_matrix = self.compute_orthogonal_matrix()?;
         let full_orth = self.construct_full_matrix(&orth_matrix)?;
-        
+
         // R^T
         let full_orth_t = full_orth.t()?;
-        
+
         Ok(merged_weight.matmul(&full_orth_t)?)
     }
 }
@@ -341,17 +343,17 @@ impl OftLayer {
     fn construct_full_matrix(&self, blocks: &Tensor) -> Result<Tensor> {
         let device = blocks.device();
         let n = self.features;
-        
+
         // Start with zeros
         let mut full_data = vec![0.0f32; n * n];
-        
+
         // Fill in blocks along diagonal
         for block_idx in 0..self.num_blocks {
             let block = blocks.i(block_idx)?;
             let block_data: Vec<f32> = block.flatten_all()?.to_vec1()?;
-            
+
             let start = block_idx * self.block_size;
-            
+
             for i in 0..self.block_size {
                 for j in 0..self.block_size {
                     let row = start + i;
@@ -360,7 +362,7 @@ impl OftLayer {
                 }
             }
         }
-        
+
         Ok(Tensor::from_vec(full_data, (n, n), device)?)
     }
 }
@@ -415,7 +417,7 @@ mod tests {
         // 64 is divisible by 8
         let layer = OftLayer::new(64, config, &device);
         assert!(layer.is_ok());
-        
+
         let layer = layer.unwrap();
         assert_eq!(layer.num_blocks(), 8);
         assert_eq!(layer.block_size(), 8);
@@ -487,13 +489,21 @@ mod tests {
         let layer = OftLayer::new(8, config, &device).unwrap();
 
         let skew = layer.make_skew_symmetric().unwrap();
-        
+
         // Check Q = -Q^T for each block
         for block_idx in 0..2 {
             let q = skew.i(block_idx).unwrap();
             let q_t = q.t().unwrap();
             let sum = q.broadcast_add(&q_t).unwrap();
-            let max_val: f32 = sum.abs().unwrap().max(0).unwrap().max(0).unwrap().to_scalar().unwrap();
+            let max_val: f32 = sum
+                .abs()
+                .unwrap()
+                .max(0)
+                .unwrap()
+                .max(0)
+                .unwrap()
+                .to_scalar()
+                .unwrap();
             assert!(max_val < 1e-5, "Matrix should be skew-symmetric");
         }
     }
@@ -526,7 +536,15 @@ mod tests {
 
         // Unmerged should be close to original
         let diff = unmerged.broadcast_sub(&base_weight).unwrap();
-        let max_diff: f32 = diff.abs().unwrap().max(0).unwrap().max(0).unwrap().to_scalar().unwrap();
+        let max_diff: f32 = diff
+            .abs()
+            .unwrap()
+            .max(0)
+            .unwrap()
+            .max(0)
+            .unwrap()
+            .to_scalar()
+            .unwrap();
         assert!(max_diff < 0.1, "Max diff: {}", max_diff); // Allow some numerical error
     }
 
@@ -580,15 +598,27 @@ mod tests {
         // 0.1 used for the approximation method in test_oft_merge_unmerge.
         const EXACT_METHOD_TOLERANCE: f32 = 0.05;
         let diff = unmerged.broadcast_sub(&base_weight).unwrap();
-        let max_diff: f32 = diff.abs().unwrap().max(0).unwrap().max(0).unwrap().to_scalar().unwrap();
-        assert!(max_diff < EXACT_METHOD_TOLERANCE, "Max diff with exact Cayley: {}", max_diff);
+        let max_diff: f32 = diff
+            .abs()
+            .unwrap()
+            .max(0)
+            .unwrap()
+            .max(0)
+            .unwrap()
+            .to_scalar()
+            .unwrap();
+        assert!(
+            max_diff < EXACT_METHOD_TOLERANCE,
+            "Max diff with exact Cayley: {}",
+            max_diff
+        );
     }
 
     #[test]
     fn test_oft_approx_vs_exact_cayley() {
         // Compare approximation vs exact methods
         let device = Device::Cpu;
-        
+
         // Approximation method
         let config_approx = OftConfig {
             r: 4,
@@ -596,7 +626,7 @@ mod tests {
             ..Default::default()
         };
         let layer_approx = OftLayer::new(16, config_approx, &device).unwrap();
-        
+
         // Exact method (with same initialization - we can't easily compare due to random init)
         let config_exact = OftConfig {
             r: 4,
@@ -604,13 +634,13 @@ mod tests {
             ..Default::default()
         };
         let layer_exact = OftLayer::new(16, config_exact, &device).unwrap();
-        
+
         // Both should produce valid outputs with correct shape
         let input = Tensor::randn(0.0f32, 1.0, (1, 10, 16), &device).unwrap();
-        
+
         let output_approx = layer_approx.forward(&input, None).unwrap();
         let output_exact = layer_exact.forward(&input, None).unwrap();
-        
+
         assert_eq!(output_approx.shape().dims(), &[1, 10, 16]);
         assert_eq!(output_exact.shape().dims(), &[1, 10, 16]);
     }

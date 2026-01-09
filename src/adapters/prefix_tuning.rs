@@ -16,16 +16,16 @@ use crate::traits::{Adapter, AdapterConfig};
 pub struct PrefixTuningConfig {
     /// Number of prefix tokens to prepend.
     pub num_prefix_tokens: usize,
-    
+
     /// Hidden dimension of prefix vectors.
     pub prefix_dim: usize,
-    
+
     /// Number of attention heads.
     pub num_heads: usize,
-    
+
     /// Number of layers to apply prefix to.
     pub num_layers: usize,
-    
+
     /// Whether to use a reparameterization MLP.
     #[serde(default = "default_true")]
     pub use_reparameterization: bool,

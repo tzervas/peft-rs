@@ -227,7 +227,7 @@ impl Mergeable for Ia3Layer {
         // Weight shape: [out_features, in_features]
         // For feedforward: scale along in_features (column-wise)
         // For non-feedforward: scale along out_features (row-wise)
-        
+
         if self.is_feedforward {
             // ia3_l shape: [1, in_features]
             // Broadcast multiply: each column scaled by corresponding element
@@ -245,7 +245,7 @@ impl Mergeable for Ia3Layer {
         let tolerance = 1e-8_f32;
         let tolerance_tensor = Tensor::new(tolerance, self.ia3_l.device())?;
         let safe_divisor = self.ia3_l.broadcast_add(&tolerance_tensor)?;
-        
+
         Ok(merged_weight.broadcast_div(&safe_divisor)?)
     }
 }
@@ -300,7 +300,7 @@ mod tests {
         let device = Device::Cpu;
         let layer = Ia3Layer::new(768, 768, false, config, &device);
         assert!(layer.is_ok());
-        
+
         let layer = layer.unwrap();
         assert!(!layer.is_feedforward());
         // Non-feedforward: scaling vector has shape [out_features, 1]
@@ -313,7 +313,7 @@ mod tests {
         let device = Device::Cpu;
         let layer = Ia3Layer::new(768, 3072, true, config, &device);
         assert!(layer.is_ok());
-        
+
         let layer = layer.unwrap();
         assert!(layer.is_feedforward());
         // Feedforward: scaling vector has shape [1, in_features]
@@ -343,10 +343,10 @@ mod tests {
         let config = Ia3Config::default();
         let device = Device::Cpu;
         let layer = Ia3Layer::new(768, 768, false, config, &device).unwrap();
-        
+
         let input = Tensor::zeros(&[1, 10, 768], DType::F32, &device).unwrap();
         let base_output = Tensor::ones(&[1, 10, 768], DType::F32, &device).unwrap();
-        
+
         let output = layer.forward(&input, Some(&base_output)).unwrap();
         assert_eq!(output.shape().dims(), &[1, 10, 768]);
     }
@@ -356,9 +356,9 @@ mod tests {
         let config = Ia3Config::default();
         let device = Device::Cpu;
         let layer = Ia3Layer::new(768, 3072, true, config, &device).unwrap();
-        
+
         let input = Tensor::ones(&[1, 10, 768], DType::F32, &device).unwrap();
-        
+
         let output = layer.forward(&input, None).unwrap();
         // For feedforward, output has same shape as input
         assert_eq!(output.shape().dims(), &[1, 10, 768]);
@@ -372,12 +372,17 @@ mod tests {
         };
         let device = Device::Cpu;
         let layer = Ia3Layer::new(768, 768, false, config, &device).unwrap();
-        
+
         // With init_ia3_weights=true, scaling should be all ones
         // So forward pass should return output unchanged
         let base_output = Tensor::full(2.0f32, &[1, 10, 768], &device).unwrap();
-        let output = layer.forward(&Tensor::zeros(&[1, 10, 768], DType::F32, &device).unwrap(), Some(&base_output)).unwrap();
-        
+        let output = layer
+            .forward(
+                &Tensor::zeros(&[1, 10, 768], DType::F32, &device).unwrap(),
+                Some(&base_output),
+            )
+            .unwrap();
+
         // Output should equal base_output (scaled by 1)
         let output_sum: f32 = output.sum_all().unwrap().to_scalar().unwrap();
         let expected_sum = 2.0f32 * 1.0 * 10.0 * 768.0;

@@ -318,7 +318,15 @@ mod tests {
 
         // Unmerged should be close to original
         let diff = unmerged.broadcast_sub(&base_weight).unwrap();
-        let max_diff: f32 = diff.abs().unwrap().max(0).unwrap().max(0).unwrap().to_scalar().unwrap();
+        let max_diff: f32 = diff
+            .abs()
+            .unwrap()
+            .max(0)
+            .unwrap()
+            .max(0)
+            .unwrap()
+            .to_scalar()
+            .unwrap();
         assert!(max_diff < 1e-5);
     }
 

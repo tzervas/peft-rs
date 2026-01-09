@@ -16,10 +16,10 @@ use crate::traits::{Adapter, AdapterConfig};
 pub struct PromptTuningConfig {
     /// Number of virtual tokens (soft prompt length).
     pub num_virtual_tokens: usize,
-    
+
     /// Hidden size of the model embeddings.
     pub hidden_size: usize,
-    
+
     /// Initialization strategy.
     #[serde(default)]
     pub init_strategy: PromptInit,
@@ -106,12 +106,13 @@ impl PromptTuningLayer {
     /// Concatenated embeddings [batch, num_virtual_tokens + seq_len, hidden]
     pub fn prepend_to_input(&self, input_embeds: &Tensor) -> Result<Tensor> {
         let batch_size = input_embeds.dim(0)?;
-        
+
         // Expand soft prompt for batch: [1, num_virtual_tokens, hidden] -> [batch, ...]
-        let expanded_prompt = self
-            .soft_prompt
-            .unsqueeze(0)?
-            .expand((batch_size, self.config.num_virtual_tokens, self.config.hidden_size))?;
+        let expanded_prompt = self.soft_prompt.unsqueeze(0)?.expand((
+            batch_size,
+            self.config.num_virtual_tokens,
+            self.config.hidden_size,
+        ))?;
 
         // Concatenate along sequence dimension
         Ok(Tensor::cat(&[&expanded_prompt, input_embeds], 1)?)
