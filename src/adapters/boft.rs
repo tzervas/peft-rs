@@ -23,17 +23,17 @@ use crate::traits::{Adapter, AdapterConfig, Mergeable, Trainable};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BoftConfig {
     /// Block size for butterfly factorization.
-    /// If 0, computed from boft_block_num. Must divide input features.
+    /// If 0, computed from `boft_block_num`. Must divide input features.
     #[serde(default)]
     pub boft_block_size: usize,
 
     /// Number of blocks for butterfly factorization.
-    /// If 0, computed from boft_block_size. Must divide input features.
+    /// If 0, computed from `boft_block_size`. Must divide input features.
     #[serde(default = "default_boft_block_num")]
     pub boft_block_num: usize,
 
     /// Number of butterfly factors to use (1 = no butterfly, higher = more expressive).
-    /// Must satisfy: boft_block_num must be divisible by 2^(n_butterfly_factor-1).
+    /// Must satisfy: `boft_block_num` must be divisible by `2^(n_butterfly_factor-1)`.
     #[serde(default = "default_boft_n_butterfly_factor")]
     pub boft_n_butterfly_factor: usize,
 
@@ -116,25 +116,22 @@ impl AdapterConfig for BoftConfig {
 /// `W' = W @ R` where R is constructed from butterfly factors.
 ///
 /// Each butterfly factor is: `P @ BlockDiag(O_i) @ P^T`
-/// where P is a permutation matrix and O_i are orthogonal matrices.
+/// where `P` is a permutation matrix and `O_i` are orthogonal matrices.
 pub struct BoftLayer {
     /// Skew-symmetric parameters for Cayley parameterization.
-    /// Shape: [n_butterfly_factor, block_num, block_size, block_size]
+    /// Shape: `[n_butterfly_factor, block_num, block_size, block_size]`
     boft_r: Tensor,
     
     /// Scaling factors for output features.
-    /// Shape: [out_features, 1]
+    /// Shape: `[out_features, 1]`
     boft_s: Tensor,
     
     /// Precomputed permutation matrices for butterfly structure.
-    /// Shape: [n_butterfly_factor, features, features]
+    /// Shape: `[n_butterfly_factor, features, features]`
     boft_p: Tensor,
     
     /// Configuration
     config: BoftConfig,
-    
-    /// Input dimension
-    in_features: usize,
     
     /// Output dimension
     out_features: usize,
@@ -190,10 +187,11 @@ impl BoftLayer {
         };
 
         // Butterfly factor validation (internally we use n-1)
-        let n_butterfly_factor = config.boft_n_butterfly_factor - 1;
+        let n_butterfly_factor = config.boft_n_butterfly_factor.saturating_sub(1);
         
         if n_butterfly_factor > 0 {
             // Check block_num divisibility
+            #[allow(clippy::cast_possible_truncation)]
             let divisor = 2_usize.pow(n_butterfly_factor as u32);
             if block_num % divisor != 0 {
                 return Err(PeftError::InvalidConfig(format!(
@@ -253,7 +251,6 @@ impl BoftLayer {
             boft_s,
             boft_p,
             config,
-            in_features,
             out_features,
             block_size,
             block_num,
@@ -273,7 +270,9 @@ impl BoftLayer {
         let mut permutation_matrices = Vec::new();
 
         for i in 0..=n_butterfly_factor {
+            #[allow(clippy::cast_possible_truncation)]
             let current_block_num = block_num / (2_usize.pow(i as u32));
+            #[allow(clippy::cast_possible_truncation)]
             let current_block_size = block_size * (2_usize.pow(i as u32));
             
             let perm_indices = Self::block_butterfly_perm(
@@ -375,9 +374,9 @@ impl BoftLayer {
 
     /// Apply Cayley transform to skew-symmetric matrices.
     ///
-    /// For a skew-symmetric matrix Q: R = (I - Q) @ (I + Q)^{-1}
+    /// For a skew-symmetric matrix Q: `R = (I - Q) @ (I + Q)^{-1}`
     /// This produces an orthogonal matrix R.
-    fn cayley_batch(&self, skew_mat: &Tensor) -> Result<Tensor> {
+    fn cayley_batch(skew_mat: &Tensor) -> Result<Tensor> {
         let device = skew_mat.device();
         let shape = skew_mat.dims();
         let batch_size = shape[0];
@@ -390,8 +389,8 @@ impl BoftLayer {
         // I - Q
         let i_minus_q = eye.broadcast_sub(skew_mat)?;
         
-        // I + Q
-        let i_plus_q = eye.broadcast_add(skew_mat)?;
+        // I + Q (computed for potential future exact inverse implementation)
+        let _i_plus_q = eye.broadcast_add(skew_mat)?;
 
         // Solve (I + Q) @ R = (I - Q) for R
         // This is equivalent to R = (I - Q) @ (I + Q)^{-1}
@@ -419,9 +418,9 @@ impl BoftLayer {
 
     /// Construct block diagonal matrix from blocks.
     ///
-    /// Given blocks of shape [D, H, H], creates a block diagonal matrix
-    /// of shape [D*H, D*H].
-    fn block_diag(&self, blocks: &Tensor) -> Result<Tensor> {
+    /// Given blocks of shape `[D, H, H]`, creates a block diagonal matrix
+    /// of shape `[D*H, D*H]`.
+    fn block_diag(blocks: &Tensor) -> Result<Tensor> {
         let device = blocks.device();
         let shape = blocks.dims();
         let num_blocks = shape[0];
@@ -451,7 +450,7 @@ impl BoftLayer {
 
     /// Compute the full butterfly OFT matrix.
     ///
-    /// Applies the butterfly factorization: product of P @ BlockDiag @ P^T
+    /// Applies the butterfly factorization: product of `P @ BlockDiag @ P^T`
     /// across all butterfly factors.
     fn compute_butterfly_oft_matrix(&self) -> Result<Tensor> {
         // Get skew-symmetric matrices
@@ -471,10 +470,10 @@ impl BoftLayer {
             let q_reshaped = q_factor.reshape((d, h, h))?;
             
             // Apply Cayley transform to get orthogonal blocks
-            let orth_blocks = self.cayley_batch(&q_reshaped)?;
+            let orth_blocks = Self::cayley_batch(&q_reshaped)?;
             
             // Construct block diagonal matrix
-            let block_diag_mat = self.block_diag(&orth_blocks)?;
+            let block_diag_mat = Self::block_diag(&orth_blocks)?;
             
             // Get permutation matrix for this factor
             let perm = self.boft_p.i(factor_idx)?;
@@ -489,8 +488,8 @@ impl BoftLayer {
         
         // Multiply all butterfly factors together
         let mut result = butterfly_matrices[0].clone();
-        for i in 1..butterfly_matrices.len() {
-            result = butterfly_matrices[i].matmul(&result)?;
+        for butterfly_mat in butterfly_matrices.iter().skip(1) {
+            result = butterfly_mat.matmul(&result)?;
         }
         
         Ok(result)
@@ -600,8 +599,8 @@ impl Mergeable for BoftLayer {
 
 impl Trainable for BoftLayer {
     fn register_parameters(&self, var_map: &mut VarMap, prefix: &str) -> Result<()> {
-        let boft_r_name = format!("{}.boft_r", prefix);
-        let boft_s_name = format!("{}.boft_s", prefix);
+        let boft_r_name = format!("{prefix}.boft_r");
+        let boft_s_name = format!("{prefix}.boft_s");
         
         var_map.data().lock().unwrap().insert(
             boft_r_name,
