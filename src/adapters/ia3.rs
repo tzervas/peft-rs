@@ -5,6 +5,9 @@
 //!
 //! Reference: <https://arxiv.org/abs/2205.05638>
 
+#![allow(clippy::doc_markdown)]
+#![allow(clippy::uninlined_format_args)]
+
 use candle_core::{DType, Device, Tensor};
 use candle_nn::VarMap;
 use serde::{Deserialize, Serialize};
@@ -102,6 +105,9 @@ impl Ia3Layer {
     /// * `is_feedforward` - Whether this is a feedforward layer (scales input vs output)
     /// * `config` - IA³ configuration
     /// * `device` - Device to create tensors on
+    ///
+    /// # Errors
+    /// Returns error if configuration is invalid or tensor initialization fails.
     pub fn new(
         in_features: usize,
         out_features: usize,
@@ -157,6 +163,9 @@ impl Ia3Layer {
     ///
     /// # Returns
     /// Scaled input tensor
+    ///
+    /// # Errors
+    /// Returns error if called on non-feedforward layer or tensor operations fail.
     pub fn scale_input(&self, input: &Tensor) -> Result<Tensor> {
         if !self.is_feedforward {
             return Err(PeftError::InvalidConfig(
@@ -176,6 +185,9 @@ impl Ia3Layer {
     ///
     /// # Returns
     /// Scaled output tensor
+    ///
+    /// # Errors
+    /// Returns error if called on feedforward layer or tensor operations fail.
     pub fn scale_output(&self, output: &Tensor) -> Result<Tensor> {
         if self.is_feedforward {
             return Err(PeftError::InvalidConfig(

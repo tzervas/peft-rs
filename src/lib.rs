@@ -3,15 +3,15 @@
 //! Comprehensive PEFT (Parameter-Efficient Fine-Tuning) adapter library for Rust.
 //!
 //! This crate provides modular implementations of various PEFT methods:
-//! - **LoRA** (Low-Rank Adaptation)
-//! - **DoRA** (Weight-Decomposed Low-Rank Adaptation)
-//! - **AdaLoRA** (Adaptive Low-Rank Adaptation)
+//! - **`LoRA`** (Low-Rank Adaptation)
+//! - **`DoRA`** (Weight-Decomposed Low-Rank Adaptation)
+//! - **`AdaLoRA`** (Adaptive Low-Rank Adaptation)
 //! - **IA³** (Infused Adapter by Inhibiting and Amplifying Inner Activations)
-//! - **LoHa** (Low-Rank Hadamard Product)
-//! - **LoKr** (Low-Rank Kronecker Product)
+//! - **`LoHa`** (Low-Rank Hadamard Product)
+//! - **`LoKr`** (Low-Rank Kronecker Product)
 //! - **OFT** (Orthogonal Fine-Tuning)
 //! - **BOFT** (Butterfly Orthogonal Fine-Tuning)
-//! - **VeRA** (Vector-based Random Matrix Adaptation)
+//! - **`VeRA`** (Vector-based Random Matrix Adaptation)
 //! - **Prefix Tuning**
 //! - **Prompt Tuning**
 //!

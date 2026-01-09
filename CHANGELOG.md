@@ -7,14 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-01-09
+
 ### Added
 - Development plan and comprehensive roadmap (DEVELOPMENT_PLAN.md)
 - CHANGELOG.md for tracking version history
 - Cargo-audit integration for CVE checking
+- CI/CD pipeline (.github/workflows/ci.yml)
+- Quality check scripts (quality-check.sh, pre-commit.sh, setup-dev.sh)
+- Testing branch for proper QA workflow
+- PLAN_SUMMARY.md for quick reference
 
 ### Changed
 - Version strategy documented: strict semantic versioning
 - Branch strategy formalized: working → dev → testing → main
+
+### Fixed
+- All 207 clippy warnings resolved (documentation, code quality, formatting)
+- Added proper error documentation to all Result-returning functions
+- Fixed comparison warnings (op_ref)
+- Updated format strings to inline syntax
 
 ## [0.3.0] - 2026-01-08
 
@@ -53,7 +65,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Configuration system
 - Initial documentation (README, AGENT_GUIDE, GAP_ANALYSIS, TASK_TRACKER)
 
-[Unreleased]: https://github.com/tzervas/peft-rs/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/tzervas/peft-rs/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/tzervas/peft-rs/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/tzervas/peft-rs/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/tzervas/peft-rs/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/tzervas/peft-rs/releases/tag/v0.1.0

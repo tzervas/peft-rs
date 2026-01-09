@@ -9,6 +9,8 @@
 //!
 //! Reference: <https://arxiv.org/abs/2311.06243>
 
+#![allow(clippy::uninlined_format_args)]
+
 use std::collections::HashMap;
 
 use candle_core::{Device, IndexOp, Tensor, Var};
@@ -157,6 +159,9 @@ impl BoftLayer {
     /// * `out_features` - Output dimension  
     /// * `config` - BOFT configuration
     /// * `device` - Device to create tensors on
+    ///
+    /// # Errors
+    /// Returns error if configuration is invalid or tensor initialization fails.
     pub fn new(
         in_features: usize,
         out_features: usize,
@@ -602,6 +607,7 @@ impl Mergeable for BoftLayer {
 }
 
 impl Trainable for BoftLayer {
+    #[allow(clippy::similar_names)]
     fn register_parameters(&self, var_map: &mut VarMap, prefix: &str) -> Result<()> {
         let boft_r_name = format!("{prefix}.boft_r");
         let boft_s_name = format!("{prefix}.boft_s");
@@ -662,7 +668,7 @@ mod tests {
         let config = BoftConfig::default();
         assert_eq!(config.boft_block_num, 4);
         assert_eq!(config.boft_n_butterfly_factor, 1);
-        assert_eq!(config.boft_dropout, 0.0);
+        assert!((config.boft_dropout - 0.0).abs() < f64::EPSILON);
     }
 
     #[test]

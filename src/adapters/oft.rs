@@ -90,7 +90,7 @@ impl AdapterConfig for OftConfig {
 /// `R = (I - Q) @ (I + Q)^{-1}` where Q is skew-symmetric.
 pub struct OftLayer {
     /// Skew-symmetric parameters for Cayley parameterization.
-    /// Shape: [num_blocks, block_size, block_size]
+    /// Shape: [`num_blocks`, `block_size`, `block_size`]
     oft_r: Tensor,
     /// Configuration
     config: OftConfig,
@@ -111,6 +111,10 @@ impl OftLayer {
     /// * `features` - Dimension of the weight matrix (must be divisible by r)
     /// * `config` - OFT configuration
     /// * `device` - Device to create tensors on
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if configuration validation fails or if layer construction fails.
     pub fn new(features: usize, config: OftConfig, device: &Device) -> Result<Self> {
         config.validate()?;
 
@@ -213,7 +217,7 @@ impl OftLayer {
 
     /// Compute exact inverse using Newton-Schulz iteration.
     ///
-    /// Newton-Schulz iteration: X_{k+1} = X_k @ (2I - A @ X_k)
+    /// Newton-Schulz iteration: `X_{k+1}` = `X_k` @ (2I - A @ `X_k`)
     /// Converges for matrices A with ||I - A|| < 1, which is satisfied
     /// since (I + Q) is close to identity for small Q (initialized with std=0.01).
     ///
@@ -222,8 +226,12 @@ impl OftLayer {
     /// matrices close to identity. This is sufficient since:
     /// - Q is initialized with small values (std=0.01)
     /// - (I + Q) is thus very close to I, ensuring fast quadratic convergence
-    /// - Each iteration roughly squares the error: ||X_k - A^{-1}|| ≈ ||X_0 - A^{-1}||^{2^k}
+    /// - Each iteration roughly squares the error: ||`X_k` - A^{-1}|| ≈ ||`X_0` - A^{-1}||^{2^k}
     fn compute_exact_inverse(&self, matrix: &Tensor) -> Result<Tensor> {
+        // Newton-Schulz iterations: 5 iterations provides ~1e-10 accuracy for matrices
+        // close to identity, which is the case here since Q is initialized with small values.
+        const NUM_ITERATIONS: usize = 5;
+
         let device = matrix.device();
         let eye = Tensor::eye(self.block_size, candle_core::DType::F32, device)?;
         let two = Tensor::new(2.0f32, device)?;
@@ -232,9 +240,6 @@ impl OftLayer {
         // Start with identity as initial guess (good for matrices close to I)
         let mut x = eye.clone();
 
-        // Newton-Schulz iterations: 5 iterations provides ~1e-10 accuracy for matrices
-        // close to identity, which is the case here since Q is initialized with small values.
-        const NUM_ITERATIONS: usize = 5;
         for _ in 0..NUM_ITERATIONS {
             // X_{k+1} = X_k @ (2I - A @ X_k)
             let ax = matrix.matmul(&x)?;
@@ -545,7 +550,7 @@ mod tests {
             .unwrap()
             .to_scalar()
             .unwrap();
-        assert!(max_diff < 0.1, "Max diff: {}", max_diff); // Allow some numerical error
+        assert!(max_diff < 0.1, "Max diff: {max_diff}"); // Allow some numerical error
     }
 
     #[test]
@@ -580,6 +585,11 @@ mod tests {
     #[test]
     fn test_oft_exact_cayley_merge_unmerge() {
         // Test merge/unmerge with exact Cayley - should have better accuracy
+        // The exact method uses Newton-Schulz iteration which provides higher precision
+        // for the Cayley transform computation. Tolerance of 0.05 is stricter than the
+        // 0.1 used for the approximation method in test_oft_merge_unmerge.
+        const EXACT_METHOD_TOLERANCE: f32 = 0.05;
+
         let config = OftConfig {
             r: 4,
             use_exact_cayley: true,
@@ -592,11 +602,6 @@ mod tests {
         let merged = layer.merge(&base_weight).unwrap();
         let unmerged = layer.unmerge(&merged).unwrap();
 
-        // With exact method, should have better accuracy than approximation.
-        // The exact method uses Newton-Schulz iteration which provides higher precision
-        // for the Cayley transform computation. Tolerance of 0.05 is stricter than the
-        // 0.1 used for the approximation method in test_oft_merge_unmerge.
-        const EXACT_METHOD_TOLERANCE: f32 = 0.05;
         let diff = unmerged.broadcast_sub(&base_weight).unwrap();
         let max_diff: f32 = diff
             .abs()
@@ -609,8 +614,7 @@ mod tests {
             .unwrap();
         assert!(
             max_diff < EXACT_METHOD_TOLERANCE,
-            "Max diff with exact Cayley: {}",
-            max_diff
+            "Max diff with exact Cayley: {max_diff}"
         );
     }
 

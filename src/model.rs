@@ -115,10 +115,7 @@ impl<A: Adapter> PeftModel<A> {
                 let adapter = adapter_factory(module_name)?;
                 let module_name_owned = module_name.to_string();
 
-                let module_entry = self
-                    .module_adapters
-                    .entry(module_name_owned)
-                    .or_default();
+                let module_entry = self.module_adapters.entry(module_name_owned).or_default();
 
                 module_entry.insert(
                     adapter_name.clone(),
@@ -149,12 +146,11 @@ impl<A: Adapter> PeftModel<A> {
     /// # Errors
     /// Returns an error if the module or adapter doesn't exist
     pub fn set_adapter(&mut self, module_name: &str, adapter_name: &str) -> Result<()> {
-        let adapters = self
-            .module_adapters
-            .get_mut(module_name)
-            .ok_or_else(|| PeftError::AdapterNotFound {
+        let adapters = self.module_adapters.get_mut(module_name).ok_or_else(|| {
+            PeftError::AdapterNotFound {
                 name: format!("module '{module_name}' not found"),
-            })?;
+            }
+        })?;
 
         if !adapters.contains_key(adapter_name) {
             return Err(PeftError::AdapterNotFound {
@@ -183,9 +179,7 @@ impl<A: Adapter> PeftModel<A> {
         let adapter_name = adapter_name.into();
 
         if !self.adapter_names.contains(&adapter_name) {
-            return Err(PeftError::AdapterNotFound {
-                name: adapter_name,
-            });
+            return Err(PeftError::AdapterNotFound { name: adapter_name });
         }
 
         for adapters in self.module_adapters.values_mut() {
@@ -242,12 +236,12 @@ impl<A: Adapter> PeftModel<A> {
         input: &Tensor,
         base_output: Option<&Tensor>,
     ) -> Result<Tensor> {
-        let adapters = self
-            .module_adapters
-            .get(module_name)
-            .ok_or_else(|| PeftError::AdapterNotFound {
-                name: format!("module '{module_name}' not found"),
-            })?;
+        let adapters =
+            self.module_adapters
+                .get(module_name)
+                .ok_or_else(|| PeftError::AdapterNotFound {
+                    name: format!("module '{module_name}' not found"),
+                })?;
 
         // Find active adapter
         for entry in adapters.values() {
@@ -266,12 +260,12 @@ impl<A: Adapter> PeftModel<A> {
     /// # Errors
     /// Returns an error if module or adapter not found
     pub fn get_adapter(&self, module_name: &str, adapter_name: &str) -> Result<&A> {
-        let adapters = self
-            .module_adapters
-            .get(module_name)
-            .ok_or_else(|| PeftError::AdapterNotFound {
-                name: format!("module '{module_name}' not found"),
-            })?;
+        let adapters =
+            self.module_adapters
+                .get(module_name)
+                .ok_or_else(|| PeftError::AdapterNotFound {
+                    name: format!("module '{module_name}' not found"),
+                })?;
 
         adapters
             .get(adapter_name)

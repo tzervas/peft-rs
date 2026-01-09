@@ -8,7 +8,7 @@ use crate::traits::AdapterConfig;
 /// Common configuration shared across adapter types.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BaseAdapterConfig {
-    /// Target modules to apply adapters to (e.g., ["q_proj", "v_proj"]).
+    /// Target modules to apply adapters to (e.g., [`q_proj`, `v_proj`]).
     pub target_modules: Vec<String>,
 
     /// Whether to apply to all linear layers matching the pattern.

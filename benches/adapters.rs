@@ -1,8 +1,12 @@
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
+//! Benchmarks for PEFT adapters
+
+#![allow(missing_docs)]
+
+use criterion::{criterion_group, criterion_main, Criterion};
 
 fn benchmark_adapters(c: &mut Criterion) {
     // Benchmarks will be implemented as adapters are completed
-    let mut group = c.benchmark_group("adapters");
+    let group = c.benchmark_group("adapters");
     group.finish();
 }
 
