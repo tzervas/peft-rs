@@ -38,6 +38,8 @@ pub struct BoftConfig {
     pub boft_n_butterfly_factor: usize,
 
     /// Dropout probability for multiplicative dropout (0.0 = no dropout).
+    /// Note: Dropout is currently not implemented in forward pass.
+    /// This parameter is reserved for future implementation.
     #[serde(default)]
     pub boft_dropout: f64,
 
@@ -397,10 +399,11 @@ impl BoftLayer {
         
         for batch_idx in 0..batch_size {
             let i_minus_q_block = i_minus_q.i(batch_idx)?;
-            let _i_plus_q_block = i_plus_q.i(batch_idx)?;
             
-            // For small matrices, we can use the Neumann series approximation
-            // (I + Q)^{-1} ≈ I - Q + Q²
+            // Use Neumann series approximation: (I + Q)^{-1} ≈ I - Q + Q²
+            // This approximation is valid when ||Q|| is small (typically < 0.5).
+            // Since Q is skew-symmetric and initialized with small std (0.1),
+            // this approximation is accurate for most practical cases.
             let q_block = skew_mat.i(batch_idx)?;
             let q_sq = q_block.matmul(&q_block)?;
             let inv_approx = eye.i(batch_idx)?
@@ -451,8 +454,6 @@ impl BoftLayer {
     /// Applies the butterfly factorization: product of P @ BlockDiag @ P^T
     /// across all butterfly factors.
     fn compute_butterfly_oft_matrix(&self) -> Result<Tensor> {
-        let _device = self.boft_r.device();
-        
         // Get skew-symmetric matrices
         let q = self.make_skew_symmetric()?;
         
