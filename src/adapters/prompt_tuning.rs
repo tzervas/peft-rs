@@ -5,7 +5,7 @@
 //!
 //! Reference: <https://arxiv.org/abs/2104.08691>
 
-use candle_core::{DType, Device, Tensor};
+use candle_core::{Device, Tensor};
 use serde::{Deserialize, Serialize};
 
 use crate::error::{PeftError, Result};
@@ -16,10 +16,10 @@ use crate::traits::{Adapter, AdapterConfig};
 pub struct PromptTuningConfig {
     /// Number of virtual tokens (soft prompt length).
     pub num_virtual_tokens: usize,
-    
+
     /// Hidden size of the model embeddings.
     pub hidden_size: usize,
-    
+
     /// Initialization strategy.
     #[serde(default)]
     pub init_strategy: PromptInit,
@@ -63,7 +63,7 @@ impl AdapterConfig for PromptTuningConfig {
 ///
 /// Maintains soft prompt embeddings that are prepended to input embeddings.
 pub struct PromptTuningLayer {
-    /// Soft prompt embeddings: [num_virtual_tokens, hidden_size]
+    /// Soft prompt embeddings: [`num_virtual_tokens`, `hidden_size`]
     soft_prompt: Tensor,
     /// Configuration
     config: PromptTuningConfig,
@@ -75,6 +75,10 @@ impl PromptTuningLayer {
     /// # Arguments
     /// * `config` - Prompt tuning configuration
     /// * `device` - Device to create tensors on
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if configuration validation fails or layer construction fails.
     pub fn new(config: PromptTuningConfig, device: &Device) -> Result<Self> {
         config.validate()?;
 
@@ -100,18 +104,23 @@ impl PromptTuningLayer {
     /// Prepend soft prompts to input embeddings.
     ///
     /// # Arguments
-    /// * `input_embeds` - Input embeddings [batch, seq_len, hidden]
+    /// * `input_embeds` - Input embeddings [batch, `seq_len`, hidden]
     ///
     /// # Returns
-    /// Concatenated embeddings [batch, num_virtual_tokens + seq_len, hidden]
+    /// Concatenated embeddings [batch, `num_virtual_tokens` + `seq_len`, hidden]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if tensor operations fail.
     pub fn prepend_to_input(&self, input_embeds: &Tensor) -> Result<Tensor> {
         let batch_size = input_embeds.dim(0)?;
-        
+
         // Expand soft prompt for batch: [1, num_virtual_tokens, hidden] -> [batch, ...]
-        let expanded_prompt = self
-            .soft_prompt
-            .unsqueeze(0)?
-            .expand((batch_size, self.config.num_virtual_tokens, self.config.hidden_size))?;
+        let expanded_prompt = self.soft_prompt.unsqueeze(0)?.expand((
+            batch_size,
+            self.config.num_virtual_tokens,
+            self.config.hidden_size,
+        ))?;
 
         // Concatenate along sequence dimension
         Ok(Tensor::cat(&[&expanded_prompt, input_embeds], 1)?)
@@ -137,6 +146,7 @@ impl Adapter for PromptTuningLayer {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use candle_core::DType;
 
     #[test]
     fn test_prompt_tuning_creation() {

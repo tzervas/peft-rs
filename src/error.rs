@@ -47,6 +47,10 @@ pub enum PeftError {
     #[error("failed to load weights: {0}")]
     WeightLoad(String),
 
+    /// I/O error (file operations, serialization, etc.).
+    #[error("I/O error: {0}")]
+    Io(String),
+
     /// Device mismatch.
     #[error("device mismatch: tensors must be on the same device")]
     DeviceMismatch,

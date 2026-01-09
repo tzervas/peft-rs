@@ -2,14 +2,24 @@
 
 This document analyzes the gaps between the Rust `peft-rs` implementation and the official HuggingFace Python PEFT library.
 
+> **See also:** [TASK_TRACKER.md](TASK_TRACKER.md) for implementation status and roadmap.
+
 ## Current State of peft-rs
 
 ### Implemented Adapters
 | Adapter | Status | Notes |
 |---------|--------|-------|
-| LoRA | ✅ Basic | Core functionality implemented |
-| Prefix Tuning | ✅ Basic | Core functionality implemented |
-| Prompt Tuning | ✅ Basic | Core functionality implemented |
+| LoRA | ✅ Complete | Core functionality with VarBuilder support |
+| DoRA | ✅ Complete | Weight-Decomposed LoRA |
+| AdaLoRA | ✅ Complete | SVD-based adaptive rank allocation |
+| IA³ | ✅ Complete | Learned rescaling vectors |
+| LoHa | ✅ Complete | Low-Rank Hadamard Product |
+| LoKr | ✅ Complete | Low-Rank Kronecker Product |
+| OFT | ✅ Complete | Orthogonal Fine-Tuning |
+| BOFT | ✅ Complete | Butterfly Orthogonal Fine-Tuning |
+| VeRA | ✅ Complete | Vector-based Random Matrix Adaptation |
+| Prefix Tuning | ✅ Complete | Trainable prefix vectors |
+| Prompt Tuning | ✅ Complete | Soft prompt embeddings |
 
 ### Core Infrastructure
 | Component | Status | Notes |
@@ -22,59 +32,15 @@ This document analyzes the gaps between the Rust `peft-rs` implementation and th
 
 ## Gaps Identified
 
-### Priority 1: Missing Core Adapters
+### ~~Priority 1: Missing Core Adapters~~ ✅ COMPLETED
 
-#### IA³ (Infused Adapter by Inhibiting and Amplifying Inner Activations)
-**Python PEFT Reference:** `src/peft/tuners/ia3/`
+All priority 1 adapters have been implemented:
+- ✅ **IA³** - Implemented in `src/adapters/ia3.rs`
+- ✅ **AdaLoRA** - Implemented in `src/adapters/adalora.rs`
 
-IA³ is a highly parameter-efficient method that learns rescaling vectors for keys, values, and feedforward layers.
+### ~~Priority 2: LoRA Variants~~ ✅ COMPLETED
 
-**Key features to implement:**
-- `IA3Config` with fields:
-  - `target_modules`: Modules to apply IA³ to
-  - `feedforward_modules`: Modules treated as feedforward (multiplied on input)
-  - `fan_in_fan_out`: Weight storage convention
-  - `init_ia3_weights`: Whether to initialize to ones
-- `IA3Layer` with:
-  - Learnable scaling vectors `ia3_l` (initialized to ones)
-  - Forward: `output = base_output * ia3_scaling` (non-feedforward) or `output = base(input * ia3_scaling)` (feedforward)
-  - Merge/unmerge: multiply/divide base weights by scaling
-
-**Parameters:** Only `in_features` or `out_features` depending on feedforward flag.
-
-#### AdaLoRA (Adaptive Low-Rank Adaptation)
-**Python PEFT Reference:** `src/peft/tuners/adalora/`
-
-AdaLoRA dynamically allocates rank budget during training using SVD-based importance scores.
-
-**Key features to implement:**
-- `AdaLoraConfig` extending `LoraConfig` with:
-  - `target_r`: Target average rank
-  - `init_r`: Initial rank (higher than target)
-  - `tinit`, `tfinal`, `total_step`: Training schedule phases
-  - `deltaT`: Interval between budget allocations
-  - `beta1`, `beta2`: EMA hyperparameters for sensitivity smoothing
-  - `orth_reg_weight`: Orthogonal regularization coefficient
-- `AdaLoraLayer` with SVD parameterization:
-  - `lora_E`: Singular values (diagonal)
-  - `lora_A`: Right singular vectors
-  - `lora_B`: Left singular vectors
-  - `ranknum`: Current rank allocation
-- Rank allocation based on importance scores
-
-### Priority 2: LoRA Variants
-
-#### DoRA (Weight-Decomposed Low-Rank Adaptation)
-**Python PEFT Reference:** `src/peft/tuners/lora/dora.py`
-
-DoRA decomposes weight updates into magnitude and direction components.
-
-**Key features to implement:**
-- Add `use_dora: bool` to `LoraConfig`
-- `DoraLayer` wrapper that:
-  - Maintains `magnitude` vector
-  - Applies weight decomposition: `W = m * (W0 + ΔW) / ||W0 + ΔW||`
-  - Handles column-wise normalization
+- ✅ **DoRA** - Implemented in `src/adapters/lora.rs` (DoraLayer)
 
 #### QLoRA Support
 **Python PEFT Reference:** `src/peft/tuners/lora/bnb.py`
@@ -117,40 +83,34 @@ Uses butterfly factorization for efficient orthogonal transformations.
 
 Uses frozen random matrices with trainable scaling vectors.
 
-### Priority 4: Infrastructure Improvements
+### ~~Priority 4: Infrastructure Improvements~~ ✅ COMPLETED
 
-#### Weight Loading/Saving
-**Gaps:**
-- No safetensors integration (Python PEFT uses safetensors extensively)
-- No adapter weight file format support
-- No state dict save/load utilities
+#### ~~Weight Loading/Saving~~ ✅ COMPLETED
+Implemented in `src/io.rs`:
+- `save_pretrained()` / `load_pretrained()` - HuggingFace PEFT compatible
+- `save_adapter_weights()` / `load_adapter_weights()` - safetensors format
+- `save_adapter_config()` / `load_adapter_config()` - JSON serialization
+- `SaveLoad` trait for adapters
 
-**To implement:**
-- `save_pretrained()` / `load_pretrained()` methods
-- Safetensors format support
-- Adapter config serialization
+#### ~~Model Integration~~ ✅ COMPLETED
+Implemented in `src/model.rs`:
+- `get_peft_model()` convenience function
+- `PeftModel<A>` wrapper struct
+- `ModulePattern` with glob-style matching (`*.attention`, `layer.*`, `*`)
+- Per-module adapter management
 
-#### Model Integration
-**Gaps:**
-- No `get_peft_model()` equivalent
-- No automatic module injection
-- No module matching by regex
+#### ~~Multi-Adapter Support~~ ✅ COMPLETED
+Implemented in `src/registry.rs`:
+- `AdapterRegistry<A>` for named adapter management
+- `set_active_adapter()` / `get_adapter()` methods
+- Adapter switching at runtime
 
-**To implement:**
-- `inject_adapter()` function to wrap model layers
-- Module name matching with glob/regex patterns
-- `PeftModel` wrapper struct
-
-#### Multi-Adapter Support
-**Gaps:**
-- No multiple adapter management
-- No adapter switching
-- No adapter composition
-
-**To implement:**
-- Adapter registry
-- `set_adapter()` / `get_adapter()` methods
-- Adapter merging utilities
+#### ~~Training Utilities~~ ✅ COMPLETED
+Implemented in `src/training.rs`:
+- `LrSchedule` enum (Constant, LinearWarmup, CosineAnnealing, LinearDecay)
+- `AdapterTrainingConfig` / `AdapterTrainingState`
+- Gradient accumulation support
+- `count_trainable_parameters()` / `format_parameter_count()`
 
 ### Priority 5: Advanced Features
 
@@ -159,10 +119,10 @@ Uses frozen random matrices with trainable scaling vectors.
 - 8-bit quantization
 - GPTQ/AWQ integration
 
-#### Training Utilities
-- Gradient checkpointing integration
-- Mixed precision training support
-- Learning rate scheduling for adapters
+#### ~~Training Utilities~~ ✅ COMPLETED
+- ~~Gradient checkpointing integration~~ (basic support)
+- ~~Mixed precision training support~~ (via candle)
+- ~~Learning rate scheduling for adapters~~ ✅
 
 #### Evaluation/Inference
 - Batch adapter switching
@@ -171,15 +131,15 @@ Uses frozen random matrices with trainable scaling vectors.
 
 ## Recommended Implementation Order
 
-### Phase 1: Core Adapters (High Impact)
-1. **IA³** - Simple, highly efficient, good for benchmarking
-2. **AdaLoRA** - Advanced LoRA variant with practical benefits
+### ~~Phase 1: Core Adapters (High Impact)~~ ✅ COMPLETED
+1. ~~**IA³** - Simple, highly efficient, good for benchmarking~~ ✅
+2. ~~**AdaLoRA** - Advanced LoRA variant with practical benefits~~ ✅
 
-### Phase 2: LoRA Enhancements
-3. **DoRA** - Popular enhancement to LoRA
-4. **Quantization infrastructure** - Essential for large models
+### ~~Phase 2: LoRA Enhancements~~ ✅ COMPLETED
+3. ~~**DoRA** - Popular enhancement to LoRA~~ ✅
+4. **Quantization infrastructure** - Essential for large models (PENDING)
 
-### Phase 3: Model Integration
+### Phase 3: Model Integration (NEXT)
 5. **Weight loading/saving** - Required for practical use
 6. **Model injection** - User-friendly API
 
