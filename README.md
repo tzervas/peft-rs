@@ -120,7 +120,7 @@ save_adapter_config(&config, "adapter_config.json")?;
 
 // Load adapter weights and config
 let loaded_config = load_adapter_config("adapter_config.json")?;
-let mut loaded_layer = LoraLayer::new(768, 768, loaded_config, &device)?;
+let mut loaded_layer = LoraLayer::new_with_zeros(768, 768, loaded_config, &device)?;
 load_adapter_weights(&mut loaded_layer, "adapter_weights.safetensors", &device)?;
 ```
 
@@ -135,8 +135,8 @@ use peft_rs::{AdapterRegistry, LoraLayer, LoraConfig};
 let mut registry = AdapterRegistry::new();
 
 // Register multiple adapters
-let task1_adapter = LoraLayer::new(768, 768, config1, &device)?;
-let task2_adapter = LoraLayer::new(768, 768, config2, &device)?;
+let task1_adapter = LoraLayer::new_with_zeros(768, 768, config1, &device)?;
+let task2_adapter = LoraLayer::new_with_zeros(768, 768, config2, &device)?;
 
 registry.register_adapter("task1", task1_adapter)?;
 registry.register_adapter("task2", task2_adapter)?;

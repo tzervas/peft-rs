@@ -173,10 +173,31 @@ mod tests {
         };
         load_adapter_weights(&mut loaded_adapter, &weights_path, &device)?;
 
-        // Verify loaded weights
+        // Verify loaded weights exist and have correct properties
         assert_eq!(loaded_adapter.weights.len(), 2);
         assert!(loaded_adapter.weights.contains_key("lora_a"));
         assert!(loaded_adapter.weights.contains_key("lora_b"));
+        
+        // Verify shapes match
+        assert_eq!(
+            loaded_adapter.weights["lora_a"].dims(),
+            weights["lora_a"].dims()
+        );
+        assert_eq!(
+            loaded_adapter.weights["lora_b"].dims(),
+            weights["lora_b"].dims()
+        );
+        
+        // Verify tensor values are preserved (compare sum as a simple check)
+        let original_a_sum = weights["lora_a"].sum_all()?.to_scalar::<f32>()?;
+        let loaded_a_sum = loaded_adapter.weights["lora_a"].sum_all()?.to_scalar::<f32>()?;
+        assert!((original_a_sum - loaded_a_sum).abs() < 1e-5, 
+                "lora_a sum mismatch: {} vs {}", original_a_sum, loaded_a_sum);
+        
+        let original_b_sum = weights["lora_b"].sum_all()?.to_scalar::<f32>()?;
+        let loaded_b_sum = loaded_adapter.weights["lora_b"].sum_all()?.to_scalar::<f32>()?;
+        assert!((original_b_sum - loaded_b_sum).abs() < 1e-5,
+                "lora_b sum mismatch: {} vs {}", original_b_sum, loaded_b_sum);
 
         Ok(())
     }

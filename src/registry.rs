@@ -3,8 +3,9 @@
 //! This module provides functionality for:
 //! - Registering multiple named adapters
 //! - Switching between active adapters
-//! - Composing multiple adapters
 //! - Managing adapter lifecycle
+//!
+//! Note: Adapter composition (combining multiple adapters) is planned for a future release.
 
 use std::collections::HashMap;
 
@@ -15,8 +16,9 @@ use crate::traits::Adapter;
 
 /// Registry for managing multiple named adapters.
 ///
-/// Allows switching between different adapters at runtime and
-/// composing multiple adapters together.
+/// Allows switching between different adapters at runtime.
+///
+/// Note: Adapter composition (combining multiple adapters) is planned for a future release.
 pub struct AdapterRegistry<A: Adapter> {
     /// Map of adapter names to adapters
     adapters: HashMap<String, A>,
