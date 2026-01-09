@@ -119,7 +119,7 @@ impl AdapterConfig for BoftConfig {
 /// where `P` is a permutation matrix and `O_i` are orthogonal matrices.
 pub struct BoftLayer {
     /// Skew-symmetric parameters for Cayley parameterization.
-    /// Shape: `[n_butterfly_factor, block_num, block_size, block_size]`
+    /// Shape: `[n_butterfly_factor + 1, block_num, block_size, block_size]`
     boft_r: Tensor,
     
     /// Scaling factors for output features.
@@ -127,7 +127,7 @@ pub struct BoftLayer {
     boft_s: Tensor,
     
     /// Precomputed permutation matrices for butterfly structure.
-    /// Shape: `[n_butterfly_factor, features, features]`
+    /// Shape: `[n_butterfly_factor + 1, features, features]`
     boft_p: Tensor,
     
     /// Configuration
