@@ -15,6 +15,7 @@ This document tracks the implementation progress of features in peft-rs based on
 | **LoHa** | ✅ Complete | 9 tests | Low-Rank Hadamard Product |
 | **LoKr** | ✅ Complete | 10 tests | Low-Rank Kronecker Product |
 | **OFT** | ✅ Complete | 14 tests | Orthogonal Fine-Tuning with switchable exact/approx Cayley |
+| **BOFT** | ✅ Complete | 10 tests | Butterfly Orthogonal Fine-Tuning with O(n log n) efficiency |
 | **VeRA** | ✅ Complete | 10 tests | Ultra-efficient with frozen random matrices |
 | **Prefix Tuning** | ✅ Complete | 2 tests | Trainable prefix vectors |
 | **Prompt Tuning** | ✅ Complete | 3 tests | Soft prompt embeddings |
@@ -68,36 +69,17 @@ Implemented in `src/adapters/oft.rs` with:
 
 ---
 
-### 1.4 BOFT (Butterfly Orthogonal Fine-Tuning)
-**Status:** ❌ Not Started  
-**Priority:** Low  
-**Estimated Effort:** 3-4 days
+### ~~1.4 BOFT (Butterfly Orthogonal Fine-Tuning)~~ ✅ COMPLETED
+**Status:** ✅ Complete  
+**Tests:** 10 tests passing
 
-**Description:**  
-Uses butterfly factorization for efficient orthogonal transformations.
-
-**Key Implementation Details:**
-- `BoftConfig` with fields:
-  - `boft_block_size`: Size of butterfly blocks
-  - `boft_block_num`: Number of butterfly blocks
-  - `boft_n_butterfly_factor`: Number of butterfly factors
-  - `target_modules`: Target modules
-- `BoftLayer` with:
-  - Butterfly matrix parameterization
-  - Efficient O(n log n) multiplication
-
-**Tasks:**
-- [ ] Create `src/adapters/boft.rs`
-- [ ] Implement `BoftConfig` with validation
-- [ ] Implement `BoftLayer` struct
-- [ ] Implement butterfly matrix operations
-- [ ] Implement `Adapter` trait
-- [ ] Implement `Mergeable` trait
-- [ ] Implement `Trainable` trait
-- [ ] Add unit tests
-- [ ] Export from `src/adapters/mod.rs`
-- [ ] Add to `src/lib.rs` public exports
-- [ ] Update README.md
+Implemented in `src/adapters/boft.rs` with:
+- `BoftConfig` with boft_block_size, boft_block_num, boft_n_butterfly_factor, boft_dropout, target_modules
+- `BoftLayer` with butterfly factorization for O(n log n) efficiency
+- Permutation matrix generation with block butterfly pattern
+- Block-diagonal matrix construction
+- Cayley parametrization for orthogonal blocks
+- Full Adapter, Mergeable, Trainable, SaveLoad trait implementations
 
 ---
 

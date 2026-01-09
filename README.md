@@ -17,6 +17,7 @@ Comprehensive PEFT (Parameter-Efficient Fine-Tuning) adapter library for Rust.
 - **LoHa** (Low-Rank Hadamard Product) - Hadamard product of two low-rank matrices
 - **LoKr** (Low-Rank Kronecker Product) - Kronecker product decomposition
 - **OFT** (Orthogonal Fine-Tuning) - Block-diagonal orthogonal transformations
+- **BOFT** (Butterfly Orthogonal Fine-Tuning) - Butterfly factorization for efficient orthogonal transforms
 - **VeRA** (Vector-based Random Matrix Adaptation) - Ultra-efficient with frozen random matrices
 - **Prefix Tuning** - Prepends trainable vectors to attention keys/values
 - **Prompt Tuning** - Adds learnable soft prompt embeddings
@@ -182,10 +183,10 @@ pub trait Mergeable: Adapter {
 | LoHa | ✅ | ✅ |
 | LoKr | ✅ | ✅ |
 | OFT | ✅ | ✅ |
+| BOFT | ✅ | ✅ |
 | VeRA | ✅ | ✅ |
 | Prefix Tuning | ✅ | ✅ |
 | Prompt Tuning | ✅ | ✅ |
-| BOFT | 🚧 | ✅ |
 | Weight merging | ✅ | ✅ |
 | Weight saving/loading | ✅ | ✅ |
 | Multi-adapter support | ✅ | ✅ |
