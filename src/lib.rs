@@ -46,7 +46,9 @@ pub mod adapters;
 pub mod config;
 pub mod error;
 pub mod io;
+pub mod model;
 pub mod registry;
+pub mod training;
 pub mod traits;
 
 pub use adapters::adalora::{AdaLoraConfig, AdaLoraLayer};
@@ -61,7 +63,14 @@ pub use adapters::prompt_tuning::{PromptTuningConfig, PromptTuningLayer};
 pub use adapters::vera::{VeraConfig, VeraLayer};
 pub use error::{PeftError, Result};
 pub use io::{
-    load_adapter_config, load_adapter_weights, save_adapter_config, save_adapter_weights, SaveLoad,
+    load_adapter_config, load_adapter_weights, load_pretrained, save_adapter_config,
+    save_adapter_weights, save_pretrained, SaveLoad, ADAPTER_CONFIG_FILENAME,
+    ADAPTER_WEIGHTS_FILENAME,
 };
+pub use model::{get_peft_model, ModulePattern, PeftModel};
 pub use registry::AdapterRegistry;
+pub use training::{
+    count_trainable_parameters, format_parameter_count, AdapterTrainingConfig,
+    AdapterTrainingState, LrSchedule,
+};
 pub use traits::{Adapter, AdapterConfig, Mergeable, Trainable};
