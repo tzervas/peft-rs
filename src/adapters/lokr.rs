@@ -1,10 +1,16 @@
-//! LoKr (Low-Rank Kronecker Product) implementation.
+//! `LoKr` (Low-Rank Kronecker Product) implementation.
 //!
-//! LoKr uses Kronecker product decomposition for efficient weight updates.
+//! `LoKr` uses Kronecker product decomposition for efficient weight updates.
 //! The weight matrix is factorized as: `ΔW = kron(A, B)` where the Kronecker
 //! product allows for structured, parameter-efficient representations.
 //!
-//! Reference: <https://arxiv.org/abs/2108.06098> (LyCORIS)
+//! Reference: <https://arxiv.org/abs/2108.06098> (`LyCORIS`)
+
+#![allow(clippy::doc_markdown)]
+#![allow(clippy::cast_possible_truncation)]
+#![allow(clippy::cast_precision_loss)]
+#![allow(clippy::cast_sign_loss)]
+#![allow(clippy::missing_errors_doc)]
 
 use candle_core::{Device, Tensor};
 use candle_nn::VarMap;
@@ -171,6 +177,7 @@ impl LoKrLayer {
 
     /// Compute the Kronecker product of two 2D tensors.
     /// kron(A, B) where A is [m, n] and B is [p, q] produces [m*p, n*q]
+    #[allow(clippy::many_single_char_names)]
     fn kronecker_product(a: &Tensor, b: &Tensor) -> Result<Tensor> {
         let a_shape = a.dims();
         let b_shape = b.dims();

@@ -262,6 +262,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::similar_names)]
     fn test_cosine_annealing() {
         let schedule = LrSchedule::CosineAnnealing {
             total_steps: 100,

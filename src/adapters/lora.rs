@@ -1,9 +1,15 @@
-//! LoRA (Low-Rank Adaptation) implementation.
+//! `LoRA` (Low-Rank Adaptation) implementation.
 //!
-//! LoRA reduces the number of trainable parameters by decomposing weight updates
+//! `LoRA` reduces the number of trainable parameters by decomposing weight updates
 //! into low-rank matrices: `ΔW = BA` where `B ∈ R^{d×r}` and `A ∈ R^{r×k}`.
 //!
 //! Reference: <https://arxiv.org/abs/2106.09685>
+
+#![allow(clippy::doc_markdown)]
+#![allow(clippy::cast_possible_truncation)]
+#![allow(clippy::cast_precision_loss)]
+#![allow(clippy::missing_errors_doc)]
+#![allow(clippy::needless_pass_by_value)]
 
 use candle_core::{DType, Device, Module, Tensor};
 use candle_nn::{linear_no_bias, Linear, VarBuilder, VarMap};
@@ -290,9 +296,13 @@ impl DoraLayer {
     /// # Arguments
     /// * `in_features` - Input dimension
     /// * `out_features` - Output dimension
-    /// * `config` - LoRA configuration (with `use_dora: true`)
+    /// * `config` - `LoRA` configuration (with `use_dora: true`)
     /// * `device` - Device to create tensors on
     /// * `base_weight` - Optional base weight for initialization
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the layer construction fails.
     pub fn new(
         in_features: usize,
         out_features: usize,
@@ -326,7 +336,7 @@ impl DoraLayer {
         &self.magnitude
     }
 
-    /// Get the underlying LoRA layer.
+    /// Get the underlying `LoRA` layer.
     #[must_use]
     pub fn lora_layer(&self) -> &LoraLayer {
         &self.lora
@@ -344,6 +354,7 @@ impl DoraLayer {
         let a_weight = self.lora.lora_a.weight();
         let b_weight = self.lora.lora_b.weight();
         let delta_w = b_weight.matmul(a_weight)?;
+        #[allow(clippy::cast_possible_truncation)]
         let scaling = Tensor::new(self.lora.scaling as f32, delta_w.device())?;
         let delta_w = delta_w.broadcast_mul(&scaling)?;
 
@@ -434,6 +445,7 @@ impl Mergeable for DoraLayer {
         let a_weight = self.lora.lora_a.weight();
         let b_weight = self.lora.lora_b.weight();
         let delta_w = b_weight.matmul(a_weight)?;
+        #[allow(clippy::cast_possible_truncation)]
         let scaling = Tensor::new(self.lora.scaling as f32, delta_w.device())?;
         let delta_w = delta_w.broadcast_mul(&scaling)?;
 
@@ -443,6 +455,7 @@ impl Mergeable for DoraLayer {
             Ok(base_weight.clone())
         } else {
             // Best effort: just subtract ΔW (lossy)
+            #[allow(clippy::cast_possible_truncation)]
             Ok(merged_weight.broadcast_sub(&delta_w)?)
         }
     }
@@ -467,6 +480,7 @@ impl Trainable for DoraLayer {
 }
 
 impl crate::io::SaveLoad for LoraLayer {
+    #[allow(clippy::similar_names)]
     fn state_dict(&self) -> Result<std::collections::HashMap<String, Tensor>> {
         use std::collections::HashMap;
 
@@ -483,6 +497,7 @@ impl crate::io::SaveLoad for LoraLayer {
         Ok(state_dict)
     }
 
+    #[allow(clippy::similar_names)]
     fn load_state_dict(
         &mut self,
         state_dict: std::collections::HashMap<String, Tensor>,
@@ -508,14 +523,14 @@ impl crate::io::SaveLoad for LoraLayer {
         let lora_a_shape = state_dict["lora_a.weight"].dims();
         let lora_b_shape = state_dict["lora_b.weight"].dims();
 
-        if lora_a_shape != &[self.config.r, self.in_features] {
+        if lora_a_shape != [self.config.r, self.in_features] {
             return Err(PeftError::ShapeMismatch {
                 expected: vec![self.config.r, self.in_features],
                 actual: lora_a_shape.to_vec(),
             });
         }
 
-        if lora_b_shape != &[self.out_features, self.config.r] {
+        if lora_b_shape != [self.out_features, self.config.r] {
             return Err(PeftError::ShapeMismatch {
                 expected: vec![self.out_features, self.config.r],
                 actual: lora_b_shape.to_vec(),

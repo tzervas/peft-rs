@@ -65,9 +65,9 @@ impl AdapterConfig for PrefixTuningConfig {
 ///
 /// Stores trainable prefix embeddings for keys and values.
 pub struct PrefixTuningLayer {
-    /// Prefix embeddings for keys: [num_layers, num_prefix_tokens, num_heads, head_dim]
+    /// Prefix embeddings for keys: [`num_layers`, `num_prefix_tokens`, `num_heads`, `head_dim`]
     prefix_keys: Tensor,
-    /// Prefix embeddings for values: [num_layers, num_prefix_tokens, num_heads, head_dim]
+    /// Prefix embeddings for values: [`num_layers`, `num_prefix_tokens`, `num_heads`, `head_dim`]
     prefix_values: Tensor,
     /// Configuration
     config: PrefixTuningConfig,
@@ -80,6 +80,10 @@ impl PrefixTuningLayer {
     /// * `config` - Prefix tuning configuration
     /// * `head_dim` - Dimension per attention head
     /// * `device` - Device to create tensors on
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if configuration validation fails or layer construction fails.
     pub fn new(config: PrefixTuningConfig, head_dim: usize, device: &Device) -> Result<Self> {
         config.validate()?;
 
@@ -102,11 +106,19 @@ impl PrefixTuningLayer {
     }
 
     /// Get prefix keys for a specific layer.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the layer index is out of bounds.
     pub fn get_prefix_keys(&self, layer_idx: usize) -> Result<Tensor> {
         Ok(self.prefix_keys.i(layer_idx)?)
     }
 
     /// Get prefix values for a specific layer.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the layer index is out of bounds.
     pub fn get_prefix_values(&self, layer_idx: usize) -> Result<Tensor> {
         Ok(self.prefix_values.i(layer_idx)?)
     }

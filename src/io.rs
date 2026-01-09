@@ -18,16 +18,24 @@ use crate::error::{PeftError, Result};
 /// Trait for adapters that can be saved and loaded.
 pub trait SaveLoad {
     /// Get all adapter tensors as a map of name -> tensor.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if tensor retrieval fails.
     fn state_dict(&self) -> Result<HashMap<String, Tensor>>;
 
     /// Load adapter tensors from a state dict.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if tensor loading fails.
     fn load_state_dict(&mut self, state_dict: HashMap<String, Tensor>) -> Result<()>;
 }
 
 /// Save adapter weights to a safetensors file.
 ///
 /// # Arguments
-/// * `adapter` - The adapter implementing SaveLoad trait
+/// * `adapter` - The adapter implementing `SaveLoad` trait
 /// * `path` - Path to save the safetensors file
 ///
 /// # Errors
@@ -112,20 +120,20 @@ pub fn load_adapter_config<T: DeserializeOwned, P: AsRef<Path>>(path: P) -> Resu
     Ok(config)
 }
 
-/// Default filename for adapter weights in HuggingFace PEFT format.
+/// Default filename for adapter weights in `HuggingFace` PEFT format.
 pub const ADAPTER_WEIGHTS_FILENAME: &str = "adapter_model.safetensors";
 
-/// Default filename for adapter config in HuggingFace PEFT format.
+/// Default filename for adapter config in `HuggingFace` PEFT format.
 pub const ADAPTER_CONFIG_FILENAME: &str = "adapter_config.json";
 
-/// Save adapter weights and configuration to a directory in HuggingFace PEFT format.
+/// Save adapter weights and configuration to a directory in `HuggingFace` PEFT format.
 ///
 /// Creates the directory if it doesn't exist. Saves:
 /// - `adapter_model.safetensors` - Adapter weights
 /// - `adapter_config.json` - Adapter configuration
 ///
 /// # Arguments
-/// * `adapter` - The adapter implementing SaveLoad trait
+/// * `adapter` - The adapter implementing `SaveLoad` trait
 /// * `config` - The adapter configuration
 /// * `dir` - Directory path to save to
 ///
@@ -165,7 +173,7 @@ pub fn save_pretrained<T: Serialize, P: AsRef<Path>>(
     Ok(())
 }
 
-/// Load adapter weights and configuration from a directory in HuggingFace PEFT format.
+/// Load adapter weights and configuration from a directory in `HuggingFace` PEFT format.
 ///
 /// Expects:
 /// - `adapter_model.safetensors` - Adapter weights
@@ -239,6 +247,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::similar_names)]
     fn test_save_load_adapter_weights() -> anyhow::Result<()> {
         let device = Device::Cpu;
         let temp_dir = TempDir::new()?;
@@ -291,9 +300,7 @@ mod tests {
             .to_scalar::<f32>()?;
         assert!(
             (original_a_sum - loaded_a_sum).abs() < 1e-5,
-            "lora_a sum mismatch: {} vs {}",
-            original_a_sum,
-            loaded_a_sum
+            "lora_a sum mismatch: {original_a_sum} vs {loaded_a_sum}"
         );
 
         let original_b_sum = weights["lora_b"].sum_all()?.to_scalar::<f32>()?;
@@ -302,9 +309,7 @@ mod tests {
             .to_scalar::<f32>()?;
         assert!(
             (original_b_sum - loaded_b_sum).abs() < 1e-5,
-            "lora_b sum mismatch: {} vs {}",
-            original_b_sum,
-            loaded_b_sum
+            "lora_b sum mismatch: {original_b_sum} vs {loaded_b_sum}"
         );
 
         Ok(())

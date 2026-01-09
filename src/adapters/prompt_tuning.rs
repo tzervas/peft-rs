@@ -63,7 +63,7 @@ impl AdapterConfig for PromptTuningConfig {
 ///
 /// Maintains soft prompt embeddings that are prepended to input embeddings.
 pub struct PromptTuningLayer {
-    /// Soft prompt embeddings: [num_virtual_tokens, hidden_size]
+    /// Soft prompt embeddings: [`num_virtual_tokens`, `hidden_size`]
     soft_prompt: Tensor,
     /// Configuration
     config: PromptTuningConfig,
@@ -75,6 +75,10 @@ impl PromptTuningLayer {
     /// # Arguments
     /// * `config` - Prompt tuning configuration
     /// * `device` - Device to create tensors on
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if configuration validation fails or layer construction fails.
     pub fn new(config: PromptTuningConfig, device: &Device) -> Result<Self> {
         config.validate()?;
 
@@ -100,10 +104,14 @@ impl PromptTuningLayer {
     /// Prepend soft prompts to input embeddings.
     ///
     /// # Arguments
-    /// * `input_embeds` - Input embeddings [batch, seq_len, hidden]
+    /// * `input_embeds` - Input embeddings [batch, `seq_len`, hidden]
     ///
     /// # Returns
-    /// Concatenated embeddings [batch, num_virtual_tokens + seq_len, hidden]
+    /// Concatenated embeddings [batch, `num_virtual_tokens` + `seq_len`, hidden]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if tensor operations fail.
     pub fn prepend_to_input(&self, input_embeds: &Tensor) -> Result<Tensor> {
         let batch_size = input_embeds.dim(0)?;
 

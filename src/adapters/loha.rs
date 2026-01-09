@@ -1,9 +1,14 @@
-//! LoHa (Low-Rank Hadamard Product) implementation.
+//! `LoHa` (Low-Rank Hadamard Product) implementation.
 //!
-//! LoHa uses the Hadamard (element-wise) product of two low-rank matrices
+//! `LoHa` uses the Hadamard (element-wise) product of two low-rank matrices
 //! for more expressive weight updates: `ΔW = (A1 ⊗ B1) ⊙ (A2 ⊗ B2)`
 //!
-//! Reference: <https://arxiv.org/abs/2108.06098> (LyCORIS)
+//! Reference: <https://arxiv.org/abs/2108.06098> (`LyCORIS`)
+
+#![allow(clippy::doc_markdown)]
+#![allow(clippy::cast_possible_truncation)]
+#![allow(clippy::cast_precision_loss)]
+#![allow(clippy::missing_errors_doc)]
 
 use candle_core::{Device, Tensor};
 use candle_nn::VarMap;

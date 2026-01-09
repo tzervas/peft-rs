@@ -1,7 +1,7 @@
-//! VeRA (Vector-based Random Matrix Adaptation) implementation.
+//! `VeRA` (Vector-based Random Matrix Adaptation) implementation.
 //!
-//! VeRA uses frozen random matrices with trainable scaling vectors for
-//! ultra-efficient adaptation. It achieves similar performance to LoRA
+//! `VeRA` uses frozen random matrices with trainable scaling vectors for
+//! ultra-efficient adaptation. It achieves similar performance to `LoRA`
 //! with significantly fewer trainable parameters.
 //!
 //! Reference: <https://arxiv.org/abs/2310.11454>
@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use crate::error::{PeftError, Result};
 use crate::traits::{Adapter, AdapterConfig, Mergeable, Trainable};
 
-/// Configuration for VeRA adapters.
+/// Configuration for `VeRA` adapters.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VeraConfig {
     /// Rank of the random projection matrices.
@@ -31,7 +31,7 @@ pub struct VeraConfig {
     #[serde(default)]
     pub save_projection: bool,
 
-    /// Target modules to apply VeRA to.
+    /// Target modules to apply `VeRA` to.
     #[serde(default = "default_target_modules")]
     pub target_modules: Vec<String>,
 }
@@ -65,24 +65,24 @@ impl AdapterConfig for VeraConfig {
     }
 }
 
-/// VeRA layer implementing Vector-based Random Matrix Adaptation.
+/// `VeRA` layer implementing Vector-based Random Matrix Adaptation.
 ///
 /// Uses frozen random matrices A and B with trainable scaling vectors:
 /// `ΔW = B @ diag(d) @ A`
 ///
 /// Where:
-/// - A: Frozen random matrix [r, in_features] (Kaiming initialization)
-/// - B: Frozen random matrix [out_features, r] (zero initialization or small random)
+/// - A: Frozen random matrix [r, `in_features`] (Kaiming initialization)
+/// - B: Frozen random matrix [`out_features`, r] (zero initialization or small random)
 /// - d: Trainable scaling vector [r]
-/// - b: Optional trainable bias vector [out_features]
+/// - b: Optional trainable bias vector [`out_features`]
 pub struct VeraLayer {
-    /// Frozen random projection A: [r, in_features]
+    /// Frozen random projection A: [r, `in_features`]
     vera_a: Tensor,
-    /// Frozen random projection B: [out_features, r]
+    /// Frozen random projection B: [`out_features`, r]
     vera_b: Tensor,
     /// Trainable scaling vector d: [r]
     vera_d: Tensor,
-    /// Optional trainable bias b: [out_features]
+    /// Optional trainable bias b: [`out_features`]
     vera_b_bias: Option<Tensor>,
     /// Configuration
     config: VeraConfig,
@@ -95,13 +95,17 @@ pub struct VeraLayer {
 }
 
 impl VeraLayer {
-    /// Create a new VeRA layer.
+    /// Create a new `VeRA` layer.
     ///
     /// # Arguments
     /// * `in_features` - Input dimension
     /// * `out_features` - Output dimension
-    /// * `config` - VeRA configuration
+    /// * `config` - `VeRA` configuration
     /// * `device` - Device to create tensors on
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if configuration validation fails or layer construction fails.
     pub fn new(
         in_features: usize,
         out_features: usize,
@@ -111,6 +115,7 @@ impl VeraLayer {
         config.validate()?;
 
         // Initialize frozen random projection A with Kaiming uniform
+        #[allow(clippy::cast_possible_truncation, clippy::cast_precision_loss)]
         let std_a = (1.0 / in_features as f64).sqrt() as f32;
         let vera_a = Tensor::randn(0.0f32, std_a, (config.r, in_features), device)?;
 
@@ -119,6 +124,7 @@ impl VeraLayer {
         let vera_b = Tensor::zeros((out_features, config.r), candle_core::DType::F32, device)?;
 
         // Initialize trainable scaling vector d
+        #[allow(clippy::cast_possible_truncation)]
         let vera_d = Tensor::full(config.d_initial as f32, config.r, device)?;
 
         Ok(Self {
@@ -133,13 +139,17 @@ impl VeraLayer {
         })
     }
 
-    /// Create a new VeRA layer with trainable bias.
+    /// Create a new `VeRA` layer with trainable bias.
     ///
     /// # Arguments
     /// * `in_features` - Input dimension
     /// * `out_features` - Output dimension
-    /// * `config` - VeRA configuration
+    /// * `config` - `VeRA` configuration
     /// * `device` - Device to create tensors on
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if configuration validation fails or layer construction fails.
     pub fn new_with_bias(
         in_features: usize,
         out_features: usize,

@@ -374,7 +374,7 @@ mod tests {
         registry.register_adapter("adapter2", adapter2)?;
 
         let mut names = registry.adapter_names();
-        names.sort();
+        names.sort_unstable();
         assert_eq!(names, vec!["adapter1", "adapter2"]);
 
         Ok(())

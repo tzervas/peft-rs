@@ -5,6 +5,10 @@
 //!
 //! Reference: <https://arxiv.org/abs/2205.05638>
 
+#![allow(clippy::doc_markdown)]
+#![allow(clippy::missing_errors_doc)]
+#![allow(clippy::uninlined_format_args)]
+
 use candle_core::{DType, Device, Tensor};
 use candle_nn::VarMap;
 use serde::{Deserialize, Serialize};

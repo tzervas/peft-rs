@@ -8,6 +8,10 @@ use crate::Result;
 /// Configuration trait for adapter hyperparameters.
 pub trait AdapterConfig: Clone + Send + Sync {
     /// Validate the configuration parameters.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the configuration is invalid.
     fn validate(&self) -> Result<()>;
 }
 
@@ -24,6 +28,10 @@ pub trait Adapter: Send + Sync {
     ///
     /// # Returns
     /// Transformed tensor
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the forward pass fails.
     fn forward(&self, input: &Tensor, base_output: Option<&Tensor>) -> Result<Tensor>;
 
     /// Get the number of trainable parameters.
@@ -43,6 +51,10 @@ pub trait Mergeable: Adapter {
     ///
     /// # Returns
     /// New tensor with adapter weights merged
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if merging fails.
     fn merge(&self, base_weight: &Tensor) -> Result<Tensor>;
 
     /// Unmerge adapter weights from merged weights.
@@ -52,12 +64,20 @@ pub trait Mergeable: Adapter {
     ///
     /// # Returns
     /// Original base weight tensor
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if unmerging fails.
     fn unmerge(&self, merged_weight: &Tensor) -> Result<Tensor>;
 }
 
 /// Trait for trainable adapters.
 pub trait Trainable: Adapter {
     /// Register trainable parameters with the variable map.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if parameter registration fails.
     fn register_parameters(&self, var_map: &mut VarMap, prefix: &str) -> Result<()>;
 
     /// Freeze all adapter parameters (disable gradients).

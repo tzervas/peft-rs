@@ -1,12 +1,19 @@
-//! AdaLoRA (Adaptive Low-Rank Adaptation) implementation.
+//! `AdaLoRA` (Adaptive Low-Rank Adaptation) implementation.
 //!
-//! AdaLoRA dynamically allocates rank budget during training using SVD-based
+//! `AdaLoRA` dynamically allocates rank budget during training using SVD-based
 //! importance scores. It uses a three-phase training schedule:
 //! 1. Initial warmup phase (tinit steps)
-//! 2. Rank reduction phase (between tinit and total_step - tfinal)
+//! 2. Rank reduction phase (between tinit and `total_step` - tfinal)
 //! 3. Final fine-tuning phase (tfinal steps)
 //!
 //! Reference: <https://arxiv.org/abs/2303.10512>
+
+#![allow(clippy::doc_markdown)]
+#![allow(clippy::cast_possible_truncation)]
+#![allow(clippy::cast_precision_loss)]
+#![allow(clippy::cast_sign_loss)]
+#![allow(clippy::missing_errors_doc)]
+#![allow(clippy::uninlined_format_args)]
 
 use candle_core::{DType, Device, Tensor};
 use candle_nn::VarMap;
