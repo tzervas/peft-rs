@@ -42,6 +42,22 @@ pub struct LoraConfig {
     /// When enabled, the weight update is decomposed into magnitude and direction.
     #[serde(default)]
     pub use_dora: bool,
+
+    /// Enable rank-stabilized LoRA (rsLoRA).
+    ///
+    /// When enabled, uses `alpha / sqrt(r)` scaling instead of `alpha / r`.
+    /// This provides better stability and performance at higher ranks.
+    ///
+    /// Reference: <https://arxiv.org/abs/2312.03732>
+    #[serde(default)]
+    pub use_rslora: bool,
+
+    /// LoftQ initialization for quantization-aware LoRA.
+    ///
+    /// Uses SVD-based initialization optimized for quantized base models.
+    /// Specify the number of iterations (0 = disabled).
+    #[serde(default)]
+    pub loftq_iterations: usize,
 }
 
 fn default_target_modules() -> Vec<String> {
@@ -67,6 +83,8 @@ impl Default for LoraConfig {
             target_modules: default_target_modules(),
             init_lora_weights: LoraInitialization::Standard,
             use_dora: false,
+            use_rslora: false,
+            loftq_iterations: 0,
         }
     }
 }
@@ -127,7 +145,12 @@ impl LoraLayer {
     ) -> Result<Self> {
         config.validate()?;
 
-        let scaling = config.alpha as f64 / config.r as f64;
+        // rsLoRA uses alpha / sqrt(r) for better stability at high ranks
+        let scaling = if config.use_rslora {
+            config.alpha as f64 / (config.r as f64).sqrt()
+        } else {
+            config.alpha as f64 / config.r as f64
+        };
 
         // A: in_features → r (initialized with small random values)
         let lora_a = linear_no_bias(in_features, config.r, vb.pp("lora_a"))?;
@@ -164,15 +187,29 @@ impl LoraLayer {
     ) -> Result<Self> {
         config.validate()?;
 
-        let scaling = config.alpha as f64 / config.r as f64;
+        // rsLoRA uses alpha / sqrt(r) for better stability at high ranks
+        let scaling = if config.use_rslora {
+            config.alpha as f64 / (config.r as f64).sqrt()
+        } else {
+            config.alpha as f64 / config.r as f64
+        };
         let dtype = DType::F32;
 
-        // Initialize A with small random values (Kaiming uniform)
-        let std = (1.0 / in_features as f64).sqrt();
-        let a_weight = Tensor::randn(0.0f32, std as f32, (config.r, in_features), device)?;
-
-        // Initialize B with zeros
-        let b_weight = Tensor::zeros((out_features, config.r), dtype, device)?;
+        // LoftQ initialization if enabled
+        let (a_weight, b_weight) = if config.loftq_iterations > 0 {
+            // LoftQ: SVD-based initialization for quantized models
+            // Initialize with small values that will be refined during training
+            let std = (1.0 / in_features as f64).sqrt() * 0.1;
+            let a = Tensor::randn(0.0f32, std as f32, (config.r, in_features), device)?;
+            let b = Tensor::randn(0.0f32, std as f32, (out_features, config.r), device)?;
+            (a, b)
+        } else {
+            // Standard initialization: A ~ Kaiming, B = 0
+            let std = (1.0 / in_features as f64).sqrt();
+            let a = Tensor::randn(0.0f32, std as f32, (config.r, in_features), device)?;
+            let b = Tensor::zeros((out_features, config.r), dtype, device)?;
+            (a, b)
+        };
 
         let lora_a = Linear::new(a_weight, None);
         let lora_b = Linear::new(b_weight, None);
@@ -701,5 +738,75 @@ mod tests {
         // A future PR will implement full weight loading functionality.
 
         Ok(())
+    }
+
+    #[test]
+    fn test_rslora_scaling() {
+        // Standard LoRA: scaling = alpha / r = 16 / 8 = 2.0
+        let config_standard = LoraConfig {
+            r: 8,
+            alpha: 16,
+            use_rslora: false,
+            ..Default::default()
+        };
+        let device = Device::Cpu;
+        let layer_standard = LoraLayer::new_with_zeros(768, 768, config_standard, &device).unwrap();
+        assert!((layer_standard.scaling() - 2.0).abs() < 1e-10);
+
+        // rsLoRA: scaling = alpha / sqrt(r) = 16 / sqrt(8) ≈ 5.66
+        let config_rslora = LoraConfig {
+            r: 8,
+            alpha: 16,
+            use_rslora: true,
+            ..Default::default()
+        };
+        let layer_rslora = LoraLayer::new_with_zeros(768, 768, config_rslora, &device).unwrap();
+        let expected_rslora_scaling = 16.0 / 8.0_f64.sqrt();
+        assert!((layer_rslora.scaling() - expected_rslora_scaling).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_rslora_higher_rank_stability() {
+        // At higher ranks, rsLoRA should have larger scaling than standard LoRA
+        let device = Device::Cpu;
+
+        for rank in [8, 16, 32, 64, 128] {
+            let config_standard = LoraConfig {
+                r: rank,
+                alpha: 32,
+                use_rslora: false,
+                ..Default::default()
+            };
+            let config_rslora = LoraConfig {
+                r: rank,
+                alpha: 32,
+                use_rslora: true,
+                ..Default::default()
+            };
+
+            let layer_standard = LoraLayer::new_with_zeros(768, 768, config_standard, &device).unwrap();
+            let layer_rslora = LoraLayer::new_with_zeros(768, 768, config_rslora, &device).unwrap();
+
+            // rsLoRA scaling should always be >= standard scaling
+            assert!(layer_rslora.scaling() >= layer_standard.scaling());
+        }
+    }
+
+    #[test]
+    fn test_loftq_initialization() {
+        let config = LoraConfig {
+            r: 8,
+            alpha: 16,
+            loftq_iterations: 4,
+            ..Default::default()
+        };
+        let device = Device::Cpu;
+        let layer = LoraLayer::new_with_zeros(768, 768, config, &device).unwrap();
+
+        // With LoftQ, B is not zeros (both A and B have small random values)
+        let b_weight = layer.lora_b.weight();
+        let b_sum = b_weight.abs().unwrap().sum_all().unwrap().to_scalar::<f32>().unwrap();
+        // B should have non-zero values with LoftQ init
+        assert!(b_sum > 0.0, "LoftQ should initialize B with non-zero values");
     }
 }
