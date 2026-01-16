@@ -2,8 +2,8 @@
 name = "peft-rs"
 version = "0.4.0"
 edition = "2021"
-rust-version = "1.75"
-license = "MIT OR Apache-2.0"
+rust-version = "1.92"
+license = "MIT"
 description = "Comprehensive PEFT (Parameter-Efficient Fine-Tuning) adapter library for Rust"
 repository = "https://github.com/tzervas/peft-rs"
 keywords = ["peft", "lora", "machine-learning", "fine-tuning", "llm"]
