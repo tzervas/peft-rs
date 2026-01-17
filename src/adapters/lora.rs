@@ -236,6 +236,36 @@ impl LoraLayer {
     pub fn rank(&self) -> usize {
         self.config.r
     }
+
+    /// Get the LoRA A weight tensor.
+    #[must_use]
+    pub fn lora_a_weight(&self) -> &Tensor {
+        self.lora_a.weight()
+    }
+
+    /// Get the LoRA B weight tensor.
+    #[must_use]
+    pub fn lora_b_weight(&self) -> &Tensor {
+        self.lora_b.weight()
+    }
+
+    /// Get the LoRA A and B weight tensors as a tuple.
+    #[must_use]
+    pub fn weights(&self) -> (&Tensor, &Tensor) {
+        (self.lora_a.weight(), self.lora_b.weight())
+    }
+
+    /// Get the shape of LoRA A weight: [r, in_features].
+    #[must_use]
+    pub fn lora_a_shape(&self) -> Vec<usize> {
+        self.lora_a.weight().dims().to_vec()
+    }
+
+    /// Get the shape of LoRA B weight: [out_features, r].
+    #[must_use]
+    pub fn lora_b_shape(&self) -> Vec<usize> {
+        self.lora_b.weight().dims().to_vec()
+    }
 }
 
 impl Adapter for LoraLayer {
