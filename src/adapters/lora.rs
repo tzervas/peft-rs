@@ -814,7 +814,8 @@ mod tests {
                 ..Default::default()
             };
 
-            let layer_standard = LoraLayer::new_with_zeros(768, 768, config_standard, &device).unwrap();
+            let layer_standard =
+                LoraLayer::new_with_zeros(768, 768, config_standard, &device).unwrap();
             let layer_rslora = LoraLayer::new_with_zeros(768, 768, config_rslora, &device).unwrap();
 
             // rsLoRA scaling should always be >= standard scaling
@@ -835,9 +836,18 @@ mod tests {
 
         // With LoftQ, B is not zeros (both A and B have small random values)
         let b_weight = layer.lora_b.weight();
-        let b_sum = b_weight.abs().unwrap().sum_all().unwrap().to_scalar::<f32>().unwrap();
+        let b_sum = b_weight
+            .abs()
+            .unwrap()
+            .sum_all()
+            .unwrap()
+            .to_scalar::<f32>()
+            .unwrap();
         // B should have non-zero values with LoftQ init
-        assert!(b_sum > 0.0, "LoftQ should initialize B with non-zero values");
+        assert!(
+            b_sum > 0.0,
+            "LoftQ should initialize B with non-zero values"
+        );
     }
 
     #[test]
@@ -845,31 +855,41 @@ mod tests {
         // Test that LoRA layers created with VarBuilder from VarMap receive gradients
         let device = Device::Cpu;
         let varmap = VarMap::new();
-        
+
         let config = LoraConfig {
             r: 4,
             alpha: 8,
             ..Default::default()
         };
-        
+
         let vb = VarBuilder::from_varmap(&varmap, DType::F32, &device);
         let lora = LoraLayer::new(10, 10, config, vb).unwrap();
-        
+
         let vars = varmap.all_vars();
         println!("Vars count: {}", vars.len());
         for (i, v) in vars.iter().enumerate() {
-            println!("  Var {}: id={:?}, shape={:?}, is_var={}", i, v.id(), v.shape(), v.is_variable());
+            println!(
+                "  Var {}: id={:?}, shape={:?}, is_var={}",
+                i,
+                v.id(),
+                v.shape(),
+                v.is_variable()
+            );
         }
-        
+
         // Should have 2 vars: lora_a.weight and lora_b.weight
-        assert_eq!(vars.len(), 2, "Should have 2 trainable vars (A and B weights)");
-        
+        assert_eq!(
+            vars.len(),
+            2,
+            "Should have 2 trainable vars (A and B weights)"
+        );
+
         let input = Tensor::randn(0f32, 1f32, (2, 10), &device).unwrap();
         let output = lora.forward(&input, None).unwrap();
         let loss = output.sum_all().unwrap();
-        
+
         let grads = loss.backward().unwrap();
-        
+
         for (i, v) in vars.iter().enumerate() {
             let grad = grads.get(v);
             println!("  Var {} grad exists: {}", i, grad.is_some());
