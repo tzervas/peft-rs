@@ -5,6 +5,7 @@ edition = "2021"
 rust-version = "1.92"
 license = "MIT"
 description = "Comprehensive PEFT (Parameter-Efficient Fine-Tuning) adapter library for Rust"
+authors = ["Tyler Zervas <tz-dev@vectorweight.com>"]
 repository = "https://github.com/tzervas/peft-rs"
 keywords = ["peft", "lora", "machine-learning", "fine-tuning", "llm"]
 categories = ["science"]
