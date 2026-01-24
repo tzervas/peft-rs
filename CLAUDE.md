@@ -124,7 +124,7 @@ Before modifying public API:
 - [ ] Property-based tests for all adapters
 - [ ] Benchmark suite
 - [ ] HuggingFace format compatibility tests
-- [ ] Examples directory
+- [x] Examples directory
 
 ## Common Issues
 
