@@ -8,11 +8,14 @@
 #![allow(clippy::doc_markdown)]
 #![allow(clippy::uninlined_format_args)]
 
+use std::collections::HashMap;
+
 use candle_core::{DType, Device, Tensor};
 use candle_nn::VarMap;
 use serde::{Deserialize, Serialize};
 
 use crate::error::{PeftError, Result};
+use crate::io::SaveLoad;
 use crate::traits::{Adapter, AdapterConfig, Mergeable, Trainable};
 
 /// Configuration for IA³ adapters.
@@ -281,6 +284,22 @@ impl Trainable for Ia3Layer {
 
     fn is_frozen(&self) -> bool {
         self.frozen
+    }
+}
+
+impl SaveLoad for Ia3Layer {
+    fn state_dict(&self) -> Result<HashMap<String, Tensor>> {
+        let mut state_dict = HashMap::new();
+        // Insert the trainable IA³ scaling vector
+        state_dict.insert("ia3_l".to_string(), self.ia3_l.clone());
+        Ok(state_dict)
+    }
+
+    fn load_state_dict(&mut self, state_dict: HashMap<String, Tensor>) -> Result<()> {
+        if let Some(t) = state_dict.get("ia3_l") {
+            self.ia3_l = t.clone();
+        }
+        Ok(())
     }
 }
 

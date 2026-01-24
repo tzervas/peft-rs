@@ -9,11 +9,14 @@
 #![allow(clippy::cast_possible_truncation)]
 #![allow(clippy::cast_precision_loss)]
 
+use std::collections::HashMap;
+
 use candle_core::{Device, Tensor};
 use candle_nn::VarMap;
 use serde::{Deserialize, Serialize};
 
 use crate::error::{PeftError, Result};
+use crate::io::SaveLoad;
 use crate::traits::{Adapter, AdapterConfig, Mergeable, Trainable};
 
 /// Configuration for LoHa adapters.
@@ -232,6 +235,33 @@ impl Trainable for LoHaLayer {
 
     fn is_frozen(&self) -> bool {
         self.frozen
+    }
+}
+
+impl SaveLoad for LoHaLayer {
+    fn state_dict(&self) -> Result<HashMap<String, Tensor>> {
+        let mut state_dict = HashMap::new();
+        state_dict.insert("hada_w1_a".to_string(), self.hada_w1_a.clone());
+        state_dict.insert("hada_w1_b".to_string(), self.hada_w1_b.clone());
+        state_dict.insert("hada_w2_a".to_string(), self.hada_w2_a.clone());
+        state_dict.insert("hada_w2_b".to_string(), self.hada_w2_b.clone());
+        Ok(state_dict)
+    }
+
+    fn load_state_dict(&mut self, state_dict: HashMap<String, Tensor>) -> Result<()> {
+        if let Some(t) = state_dict.get("hada_w1_a") {
+            self.hada_w1_a = t.clone();
+        }
+        if let Some(t) = state_dict.get("hada_w1_b") {
+            self.hada_w1_b = t.clone();
+        }
+        if let Some(t) = state_dict.get("hada_w2_a") {
+            self.hada_w2_a = t.clone();
+        }
+        if let Some(t) = state_dict.get("hada_w2_b") {
+            self.hada_w2_b = t.clone();
+        }
+        Ok(())
     }
 }
 

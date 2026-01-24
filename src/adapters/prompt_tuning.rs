@@ -5,10 +5,13 @@
 //!
 //! Reference: <https://arxiv.org/abs/2104.08691>
 
+use std::collections::HashMap;
+
 use candle_core::{Device, Tensor};
 use serde::{Deserialize, Serialize};
 
 use crate::error::{PeftError, Result};
+use crate::io::SaveLoad;
 use crate::traits::{Adapter, AdapterConfig};
 
 /// Configuration for prompt tuning.
@@ -140,6 +143,21 @@ impl Adapter for PromptTuningLayer {
 
     fn config(&self) -> &Self::Config {
         &self.config
+    }
+}
+
+impl SaveLoad for PromptTuningLayer {
+    fn state_dict(&self) -> Result<HashMap<String, Tensor>> {
+        let mut state_dict = HashMap::new();
+        state_dict.insert("soft_prompt".to_string(), self.soft_prompt.clone());
+        Ok(state_dict)
+    }
+
+    fn load_state_dict(&mut self, state_dict: HashMap<String, Tensor>) -> Result<()> {
+        if let Some(t) = state_dict.get("soft_prompt") {
+            self.soft_prompt = t.clone();
+        }
+        Ok(())
     }
 }
 

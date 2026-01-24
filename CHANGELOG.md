@@ -7,6 +7,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-01-24
+
+### Added
+- **SaveLoad trait implementations for all 11 adapters** - Complete persistence support
+  - LoraLayer, DoraLayer (lora.rs)
+  - AdaLoraLayer (adalora.rs)
+  - Ia3Layer (ia3.rs)
+  - LoHaLayer (loha.rs)
+  - LoKrLayer (lokr.rs)
+  - OftLayer (oft.rs)
+  - BoftLayer (boft.rs) - already existed
+  - VeraLayer (vera.rs)
+  - PrefixTuningLayer (prefix_tuning.rs)
+  - PromptTuningLayer (prompt_tuning.rs)
+- **Examples directory** with 3 runnable examples:
+  - `basic_lora.rs` - Simple LoRA adapter usage
+  - `multi_adapter.rs` - Using AdapterRegistry with multiple adapters
+  - `save_load.rs` - Persisting and loading adapter weights
+- `weights()` method for LoRA adapters (from 0.4.1)
+- rsLoRA and LoftQ support for 100% Python PEFT parity
+- CLAUDE.md for Claude Code development workflow
+
+### Fixed
+- Documentation link warnings in adalora.rs and vera.rs
+- Clippy warning for inline format args in lora.rs (Rust 1.92 compatibility)
+
+### Changed
+- Bumped to stable 1.0.0 release
+- All 128 tests passing
+- Full clippy compliance with pedantic lints
+
+## [0.4.1] - 2026-01-16
+
+### Added
+- `weights()` method and individual weight accessor methods for LoRA
+
+### Fixed
+- Clippy lint fixes for Rust 1.92 compatibility
+
 ## [0.4.0] - 2026-01-09
 
 ### Added
@@ -65,7 +104,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Configuration system
 - Initial documentation (README, AGENT_GUIDE, GAP_ANALYSIS, TASK_TRACKER)
 
-[Unreleased]: https://github.com/tzervas/peft-rs/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/tzervas/peft-rs/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/tzervas/peft-rs/compare/v0.4.1...v1.0.0
+[0.4.1]: https://github.com/tzervas/peft-rs/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/tzervas/peft-rs/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/tzervas/peft-rs/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/tzervas/peft-rs/compare/v0.1.0...v0.2.0

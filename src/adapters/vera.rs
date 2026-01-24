@@ -6,11 +6,14 @@
 //!
 //! Reference: <https://arxiv.org/abs/2310.11454>
 
+use std::collections::HashMap;
+
 use candle_core::{Device, Tensor};
 use candle_nn::VarMap;
 use serde::{Deserialize, Serialize};
 
 use crate::error::{PeftError, Result};
+use crate::io::SaveLoad;
 use crate::traits::{Adapter, AdapterConfig, Mergeable, Trainable};
 
 /// Configuration for `VeRA` adapters.
@@ -71,10 +74,10 @@ impl AdapterConfig for VeraConfig {
 /// `ΔW = B @ diag(d) @ A`
 ///
 /// Where:
-/// - A: Frozen random matrix [r, `in_features`] (Kaiming initialization)
-/// - B: Frozen random matrix [`out_features`, r] (zero initialization or small random)
-/// - d: Trainable scaling vector [r]
-/// - b: Optional trainable bias vector [`out_features`]
+/// - A: Frozen random matrix `[r, in_features]` (Kaiming initialization)
+/// - B: Frozen random matrix `[out_features, r]` (zero initialization or small random)
+/// - d: Trainable scaling vector (length: `r`)
+/// - b: Optional trainable bias vector (length: `out_features`)
 pub struct VeraLayer {
     /// Frozen random projection A: [r, `in_features`]
     vera_a: Tensor,
@@ -266,6 +269,28 @@ impl Trainable for VeraLayer {
 
     fn is_frozen(&self) -> bool {
         self.frozen
+    }
+}
+
+impl SaveLoad for VeraLayer {
+    fn state_dict(&self) -> Result<HashMap<String, Tensor>> {
+        let mut state_dict = HashMap::new();
+        // Only save trainable tensors
+        state_dict.insert("vera_d".to_string(), self.vera_d.clone());
+        if let Some(ref bias) = self.vera_b_bias {
+            state_dict.insert("vera_b_bias".to_string(), bias.clone());
+        }
+        Ok(state_dict)
+    }
+
+    fn load_state_dict(&mut self, state_dict: HashMap<String, Tensor>) -> Result<()> {
+        if let Some(t) = state_dict.get("vera_d") {
+            self.vera_d = t.clone();
+        }
+        if let Some(t) = state_dict.get("vera_b_bias") {
+            self.vera_b_bias = Some(t.clone());
+        }
+        Ok(())
     }
 }
 

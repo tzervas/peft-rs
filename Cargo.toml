@@ -1,6 +1,6 @@
 [package]
 name = "peft-rs"
-version = "0.4.1"
+version = "1.0.0"
 edition = "2021"
 rust-version = "1.92"
 license = "MIT"
@@ -39,3 +39,15 @@ must_use_candidate = "allow"
 [[bench]]
 name = "adapters"
 harness = false
+
+[[example]]
+name = "basic_lora"
+path = "examples/basic_lora.rs"
+
+[[example]]
+name = "multi_adapter"
+path = "examples/multi_adapter.rs"
+
+[[example]]
+name = "save_load"
+path = "examples/save_load.rs"

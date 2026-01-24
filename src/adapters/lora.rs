@@ -10,11 +10,14 @@
 #![allow(clippy::cast_precision_loss)]
 #![allow(clippy::needless_pass_by_value)]
 
+use std::collections::HashMap;
+
 use candle_core::{DType, Device, Module, Tensor};
 use candle_nn::{linear_no_bias, Linear, VarBuilder, VarMap};
 use serde::{Deserialize, Serialize};
 
 use crate::error::{PeftError, Result};
+use crate::io::SaveLoad;
 use crate::traits::{Adapter, AdapterConfig, Mergeable, Trainable};
 
 /// Configuration for LoRA adapters.
@@ -548,11 +551,9 @@ impl Trainable for DoraLayer {
     }
 }
 
-impl crate::io::SaveLoad for LoraLayer {
+impl SaveLoad for LoraLayer {
     #[allow(clippy::similar_names)]
-    fn state_dict(&self) -> Result<std::collections::HashMap<String, Tensor>> {
-        use std::collections::HashMap;
-
+    fn state_dict(&self) -> Result<HashMap<String, Tensor>> {
         let mut state_dict = HashMap::new();
 
         // Get lora_a weight
@@ -567,10 +568,7 @@ impl crate::io::SaveLoad for LoraLayer {
     }
 
     #[allow(clippy::similar_names)]
-    fn load_state_dict(
-        &mut self,
-        state_dict: std::collections::HashMap<String, Tensor>,
-    ) -> Result<()> {
+    fn load_state_dict(&mut self, state_dict: HashMap<String, Tensor>) -> Result<()> {
         // TODO: This is a placeholder implementation that only validates tensor shapes.
         // Actual weight loading is not yet implemented because candle_nn::Linear doesn't
         // provide a way to update weights after construction. A future PR will implement
@@ -893,7 +891,7 @@ mod tests {
         for (i, v) in vars.iter().enumerate() {
             let grad = grads.get(v);
             println!("  Var {} grad exists: {}", i, grad.is_some());
-            assert!(grad.is_some(), "Gradient should exist for var {}", i);
+            assert!(grad.is_some(), "Gradient should exist for var {i}");
         }
     }
 }
