@@ -806,7 +806,8 @@ mod tests {
                 ..Default::default()
             };
 
-            let layer_standard = LoraLayer::new_with_zeros(768, 768, config_standard, &device).unwrap();
+            let layer_standard =
+                LoraLayer::new_with_zeros(768, 768, config_standard, &device).unwrap();
             let layer_rslora = LoraLayer::new_with_zeros(768, 768, config_rslora, &device).unwrap();
 
             // rsLoRA scaling should always be >= standard scaling
@@ -827,8 +828,17 @@ mod tests {
 
         // With LoftQ, B is not zeros (both A and B have small random values)
         let b_weight = layer.lora_b.weight();
-        let b_sum = b_weight.abs().unwrap().sum_all().unwrap().to_scalar::<f32>().unwrap();
+        let b_sum = b_weight
+            .abs()
+            .unwrap()
+            .sum_all()
+            .unwrap()
+            .to_scalar::<f32>()
+            .unwrap();
         // B should have non-zero values with LoftQ init
-        assert!(b_sum > 0.0, "LoftQ should initialize B with non-zero values");
+        assert!(
+            b_sum > 0.0,
+            "LoftQ should initialize B with non-zero values"
+        );
     }
 }

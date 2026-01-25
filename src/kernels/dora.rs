@@ -49,7 +49,7 @@ pub fn dora_forward_kernel<F: Float + CubeElement>(
     w: &Array<F>,
     a: &Array<F>,
     b: &Array<F>,
-    mag_norms: &Array<F>,  // Interleaved: [mag0, norm0, mag1, norm1, ...]
+    mag_norms: &Array<F>, // Interleaved: [mag0, norm0, mag1, norm1, ...]
     y: &mut Array<F>,
     scale: F,
     #[comptime] m: u32,
@@ -95,7 +95,8 @@ pub fn dora_forward_kernel<F: Float + CubeElement>(
                 let w_val = w[(ki * n + col) as usize];
                 let mut ab_val = F::new(0.0);
                 for rank_idx in 0u32..r {
-                    ab_val = ab_val + a[(ki * r + rank_idx) as usize] * b[(rank_idx * n + col) as usize];
+                    ab_val =
+                        ab_val + a[(ki * r + rank_idx) as usize] * b[(rank_idx * n + col) as usize];
                 }
                 let w_plus_lora = w_val + scale * ab_val;
                 let w_dora = norm_scale * w_plus_lora;
@@ -182,7 +183,7 @@ pub fn dora_merge_kernel<F: Float + CubeElement>(
     w: &Array<F>,
     a: &Array<F>,
     b: &Array<F>,
-    mag_norms: &Array<F>,  // Interleaved: [mag0, norm0, mag1, norm1, ...]
+    mag_norms: &Array<F>, // Interleaved: [mag0, norm0, mag1, norm1, ...]
     merged: &mut Array<F>,
     scale: F,
     #[comptime] k: u32,
@@ -282,7 +283,7 @@ pub fn batched_dora_forward_kernel<F: Float + CubeElement>(
     mag_norms: &Array<F>,
     y: &mut Array<F>,
     scale: F,
-    #[comptime] batch_seq: u32,  // batch * seq_len packed
+    #[comptime] batch_seq: u32, // batch * seq_len packed
     #[comptime] k: u32,
     #[comptime] n: u32,
     #[comptime] r: u32,
@@ -324,7 +325,8 @@ pub fn batched_dora_forward_kernel<F: Float + CubeElement>(
 
                 let mut ab_val = F::new(0.0);
                 for rank_idx in 0u32..r {
-                    ab_val = ab_val + a[(ki * r + rank_idx) as usize] * b[(rank_idx * n + col) as usize];
+                    ab_val =
+                        ab_val + a[(ki * r + rank_idx) as usize] * b[(rank_idx * n + col) as usize];
                 }
 
                 let w_plus_lora = w_val + scale * ab_val;

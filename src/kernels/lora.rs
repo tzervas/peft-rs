@@ -241,14 +241,17 @@ pub fn fused_lora_forward_tiled_kernel<F: Float + CubeElement>(
         #[unroll]
         for i in 0u32..TILE_SIZE {
             base_acc = base_acc
-                + x_tile[(UNIT_POS_Y * TILE_SIZE + i) as usize] * w_tile[(i * TILE_SIZE + UNIT_POS_X) as usize];
+                + x_tile[(UNIT_POS_Y * TILE_SIZE + i) as usize]
+                    * w_tile[(i * TILE_SIZE + UNIT_POS_X) as usize];
         }
 
         // X @ A accumulation (use first r threads in X dimension)
         if UNIT_POS_X < r {
             let mut xa_contrib = F::new(0.0);
             for i in 0u32..TILE_SIZE {
-                xa_contrib = xa_contrib + x_tile[(UNIT_POS_Y * TILE_SIZE + i) as usize] * a_tile[(i * r + UNIT_POS_X) as usize];
+                xa_contrib = xa_contrib
+                    + x_tile[(UNIT_POS_Y * TILE_SIZE + i) as usize]
+                        * a_tile[(i * r + UNIT_POS_X) as usize];
             }
             xa_shared[(UNIT_POS_Y * r + UNIT_POS_X) as usize] =
                 xa_shared[(UNIT_POS_Y * r + UNIT_POS_X) as usize] + xa_contrib;
@@ -542,7 +545,8 @@ pub fn batched_lora_forward_kernel<F: Float + CubeElement>(
         #[unroll]
         for i in 0u32..TILE_SIZE {
             base_acc = base_acc
-                + x_tile[(UNIT_POS_Y * TILE_SIZE + i) as usize] * w_tile[(i * TILE_SIZE + UNIT_POS_X) as usize];
+                + x_tile[(UNIT_POS_Y * TILE_SIZE + i) as usize]
+                    * w_tile[(i * TILE_SIZE + UNIT_POS_X) as usize];
         }
 
         // X @ A accumulation
@@ -648,7 +652,8 @@ pub fn multi_adapter_lora_forward_kernel<F: Float + CubeElement>(
         #[unroll]
         for i in 0u32..TILE_SIZE {
             base_acc = base_acc
-                + x_tile[(UNIT_POS_Y * TILE_SIZE + i) as usize] * w_tile[(i * TILE_SIZE + UNIT_POS_X) as usize];
+                + x_tile[(UNIT_POS_Y * TILE_SIZE + i) as usize]
+                    * w_tile[(i * TILE_SIZE + UNIT_POS_X) as usize];
         }
 
         // X @ A for each adapter
