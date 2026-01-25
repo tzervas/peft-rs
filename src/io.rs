@@ -53,7 +53,7 @@ pub fn save_adapter_weights<P: AsRef<Path>>(adapter: &dyn SaveLoad, path: P) -> 
         .collect();
 
     // Use candle's built-in safetensors serialization
-    safetensors::tensor::serialize_to_file(tensors, &None, path.as_ref())
+    safetensors::tensor::serialize_to_file(tensors, None, path.as_ref())
         .map_err(|e| PeftError::Io(format!("Failed to save safetensors: {e}")))?;
 
     Ok(())

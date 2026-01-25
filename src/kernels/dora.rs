@@ -44,7 +44,7 @@ const TILE_SIZE: u32 = 32;
 /// * `n` - Output features dimension
 /// * `r` - LoRA rank
 #[cube(launch)]
-pub fn dora_forward_kernel<F: Float>(
+pub fn dora_forward_kernel<F: Float + CubeElement>(
     x: &Array<F>,
     w: &Array<F>,
     a: &Array<F>,
@@ -61,15 +61,15 @@ pub fn dora_forward_kernel<F: Float>(
     let col = CUBE_POS_X * TILE_SIZE + UNIT_POS_X;
 
     if row >= m || col >= n {
-        return;
+        terminate!();
     }
 
     // Get magnitude and norm for this column (interleaved storage)
-    let mag = mag_norms[col * 2u32];
-    let col_norm = mag_norms[col * 2u32 + 1u32];
+    let mag = mag_norms[(col * 2u32) as usize];
+    let col_norm = mag_norms[(col * 2u32 + 1u32) as usize];
     let norm_scale = mag / (col_norm + F::new(1e-8));
 
-    let mut x_tile = SharedMemory::<F>::new(TILE_SIZE * TILE_SIZE);
+    let mut x_tile = SharedMemory::<F>::new((TILE_SIZE * TILE_SIZE) as usize);
     let mut acc = F::new(0.0);
 
     let num_k_tiles = (k + TILE_SIZE - 1u32) / TILE_SIZE;
@@ -79,23 +79,23 @@ pub fn dora_forward_kernel<F: Float>(
 
         let x_row = CUBE_POS_Y * TILE_SIZE + UNIT_POS_Y;
         let x_col = k_base + UNIT_POS_X;
-        x_tile[UNIT_POS_Y * TILE_SIZE + UNIT_POS_X] = if x_row < m && x_col < k {
-            x[x_row * k + x_col]
+        x_tile[(UNIT_POS_Y * TILE_SIZE + UNIT_POS_X) as usize] = if x_row < m && x_col < k {
+            x[(x_row * k + x_col) as usize]
         } else {
             F::new(0.0)
         };
 
-        sync_units();
+        sync_cube();
 
         for i in 0u32..TILE_SIZE {
             let ki = k_base + i;
             if ki < k {
-                let x_elem = x_tile[UNIT_POS_Y * TILE_SIZE + i];
+                let x_elem = x_tile[(UNIT_POS_Y * TILE_SIZE + i) as usize];
 
-                let w_val = w[ki * n + col];
+                let w_val = w[(ki * n + col) as usize];
                 let mut ab_val = F::new(0.0);
                 for rank_idx in 0u32..r {
-                    ab_val = ab_val + a[ki * r + rank_idx] * b[rank_idx * n + col];
+                    ab_val = ab_val + a[(ki * r + rank_idx) as usize] * b[(rank_idx * n + col) as usize];
                 }
                 let w_plus_lora = w_val + scale * ab_val;
                 let w_dora = norm_scale * w_plus_lora;
@@ -104,10 +104,10 @@ pub fn dora_forward_kernel<F: Float>(
             }
         }
 
-        sync_units();
+        sync_cube();
     }
 
-    y[row * n + col] = acc;
+    y[(row * n + col) as usize] = acc;
 }
 
 /// Compute column norms for DoRA.
@@ -127,7 +127,7 @@ pub fn dora_forward_kernel<F: Float>(
 /// * `n` - Output features dimension
 /// * `r` - LoRA rank
 #[cube(launch)]
-pub fn dora_compute_column_norms_kernel<F: Float>(
+pub fn dora_compute_column_norms_kernel<F: Float + CubeElement>(
     w: &Array<F>,
     a: &Array<F>,
     b: &Array<F>,
@@ -140,26 +140,26 @@ pub fn dora_compute_column_norms_kernel<F: Float>(
     let col = CUBE_POS_X * TILE_SIZE + UNIT_POS_X;
 
     if col >= n {
-        return;
+        terminate!();
     }
 
     // Compute ||W[:, col] + scale * (A @ B)[:, col]||^2
     let mut norm_sq = F::new(0.0);
 
     for ki in 0u32..k {
-        let w_val = w[ki * n + col];
+        let w_val = w[(ki * n + col) as usize];
 
         // A[ki, :] @ B[:, col]
         let mut ab_val = F::new(0.0);
         for rank_idx in 0u32..r {
-            ab_val = ab_val + a[ki * r + rank_idx] * b[rank_idx * n + col];
+            ab_val = ab_val + a[(ki * r + rank_idx) as usize] * b[(rank_idx * n + col) as usize];
         }
 
         let combined = w_val + scale * ab_val;
         norm_sq = norm_sq + combined * combined;
     }
 
-    norms[col] = F::sqrt(norm_sq);
+    norms[col as usize] = F::sqrt(norm_sq);
 }
 
 /// DoRA merge kernel.
@@ -178,7 +178,7 @@ pub fn dora_compute_column_norms_kernel<F: Float>(
 /// * `n` - Output features
 /// * `r` - LoRA rank
 #[cube(launch)]
-pub fn dora_merge_kernel<F: Float>(
+pub fn dora_merge_kernel<F: Float + CubeElement>(
     w: &Array<F>,
     a: &Array<F>,
     b: &Array<F>,
@@ -193,26 +193,26 @@ pub fn dora_merge_kernel<F: Float>(
     let col = CUBE_POS_X * TILE_SIZE + UNIT_POS_X;
 
     if row >= k || col >= n {
-        return;
+        terminate!();
     }
 
     // Get magnitude and norm for this column (interleaved storage)
-    let mag = mag_norms[col * 2u32];
-    let col_norm = mag_norms[col * 2u32 + 1u32];
+    let mag = mag_norms[(col * 2u32) as usize];
+    let col_norm = mag_norms[(col * 2u32 + 1u32) as usize];
     let norm_scale = mag / (col_norm + F::new(1e-8));
 
     // W[row, col]
-    let w_val = w[row * n + col];
+    let w_val = w[(row * n + col) as usize];
 
     // A[row, :] @ B[:, col]
     let mut ab_val = F::new(0.0);
     for rank_idx in 0u32..r {
-        ab_val = ab_val + a[row * r + rank_idx] * b[rank_idx * n + col];
+        ab_val = ab_val + a[(row * r + rank_idx) as usize] * b[(rank_idx * n + col) as usize];
     }
 
     // Apply DoRA transformation
     let w_plus_lora = w_val + scale * ab_val;
-    merged[row * n + col] = norm_scale * w_plus_lora;
+    merged[(row * n + col) as usize] = norm_scale * w_plus_lora;
 }
 
 /// DoRA delta kernel (in-place update).
@@ -222,7 +222,7 @@ pub fn dora_merge_kernel<F: Float>(
 ///
 /// Assumes Y already contains some base computation.
 #[cube(launch)]
-pub fn dora_delta_kernel<F: Float>(
+pub fn dora_delta_kernel<F: Float + CubeElement>(
     x: &Array<F>,
     w: &Array<F>,
     a: &Array<F>,
@@ -239,23 +239,23 @@ pub fn dora_delta_kernel<F: Float>(
     let col = CUBE_POS_X * TILE_SIZE + UNIT_POS_X;
 
     if row >= m || col >= n {
-        return;
+        terminate!();
     }
 
-    let mag = mag_norms[col * 2u32];
-    let col_norm = mag_norms[col * 2u32 + 1u32];
+    let mag = mag_norms[(col * 2u32) as usize];
+    let col_norm = mag_norms[(col * 2u32 + 1u32) as usize];
     let norm_scale = mag / (col_norm + F::new(1e-8));
 
     // Compute X[row, :] @ normalized(W[:, col] + scale * A @ B[:, col])
     let mut acc = F::new(0.0);
 
     for ki in 0u32..k {
-        let x_elem = x[row * k + ki];
-        let w_val = w[ki * n + col];
+        let x_elem = x[(row * k + ki) as usize];
+        let w_val = w[(ki * n + col) as usize];
 
         let mut ab_val = F::new(0.0);
         for rank_idx in 0u32..r {
-            ab_val = ab_val + a[ki * r + rank_idx] * b[rank_idx * n + col];
+            ab_val = ab_val + a[(ki * r + rank_idx) as usize] * b[(rank_idx * n + col) as usize];
         }
 
         let w_plus_lora = w_val + scale * ab_val;
@@ -264,7 +264,7 @@ pub fn dora_delta_kernel<F: Float>(
     }
 
     // Add to existing output
-    y[row * n + col] = y[row * n + col] + acc;
+    y[(row * n + col) as usize] = y[(row * n + col) as usize] + acc;
 }
 
 /// Batched DoRA forward kernel.
@@ -274,7 +274,7 @@ pub fn dora_delta_kernel<F: Float>(
 ///
 /// Uses packed dimension parameter to stay under CubeCL parameter limits.
 #[cube(launch)]
-pub fn batched_dora_forward_kernel<F: Float>(
+pub fn batched_dora_forward_kernel<F: Float + CubeElement>(
     x: &Array<F>,
     w: &Array<F>,
     a: &Array<F>,
@@ -291,14 +291,14 @@ pub fn batched_dora_forward_kernel<F: Float>(
     let col = CUBE_POS_X * TILE_SIZE + UNIT_POS_X;
 
     if row >= batch_seq || col >= n {
-        return;
+        terminate!();
     }
 
-    let mag = mag_norms[col * 2u32];
-    let col_norm = mag_norms[col * 2u32 + 1u32];
+    let mag = mag_norms[(col * 2u32) as usize];
+    let col_norm = mag_norms[(col * 2u32 + 1u32) as usize];
     let norm_scale = mag / (col_norm + F::new(1e-8));
 
-    let mut x_tile = SharedMemory::<F>::new(TILE_SIZE * TILE_SIZE);
+    let mut x_tile = SharedMemory::<F>::new((TILE_SIZE * TILE_SIZE) as usize);
     let mut acc = F::new(0.0);
 
     let num_k_tiles = (k + TILE_SIZE - 1u32) / TILE_SIZE;
@@ -308,23 +308,23 @@ pub fn batched_dora_forward_kernel<F: Float>(
 
         let x_row = CUBE_POS_Y * TILE_SIZE + UNIT_POS_Y;
         let x_col = k_base + UNIT_POS_X;
-        x_tile[UNIT_POS_Y * TILE_SIZE + UNIT_POS_X] = if x_row < batch_seq && x_col < k {
-            x[x_row * k + x_col]
+        x_tile[(UNIT_POS_Y * TILE_SIZE + UNIT_POS_X) as usize] = if x_row < batch_seq && x_col < k {
+            x[(x_row * k + x_col) as usize]
         } else {
             F::new(0.0)
         };
 
-        sync_units();
+        sync_cube();
 
         for i in 0u32..TILE_SIZE {
             let ki = k_base + i;
             if ki < k {
-                let x_elem = x_tile[UNIT_POS_Y * TILE_SIZE + i];
-                let w_val = w[ki * n + col];
+                let x_elem = x_tile[(UNIT_POS_Y * TILE_SIZE + i) as usize];
+                let w_val = w[(ki * n + col) as usize];
 
                 let mut ab_val = F::new(0.0);
                 for rank_idx in 0u32..r {
-                    ab_val = ab_val + a[ki * r + rank_idx] * b[rank_idx * n + col];
+                    ab_val = ab_val + a[(ki * r + rank_idx) as usize] * b[(rank_idx * n + col) as usize];
                 }
 
                 let w_plus_lora = w_val + scale * ab_val;
@@ -333,10 +333,10 @@ pub fn batched_dora_forward_kernel<F: Float>(
             }
         }
 
-        sync_units();
+        sync_cube();
     }
 
-    y[row * n + col] = acc;
+    y[(row * n + col) as usize] = acc;
 }
 
 #[cfg(test)]
