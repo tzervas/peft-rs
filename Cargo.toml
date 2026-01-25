@@ -10,23 +10,27 @@ keywords = ["peft", "lora", "machine-learning", "fine-tuning", "llm"]
 categories = ["science"]
 
 [dependencies]
-candle-core = "0.9"
-candle-nn = "0.9"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-safetensors = "0.4"
-thiserror = "2.0"
-tracing = "0.1"
+candle-core = { workspace = true }
+candle-nn = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+safetensors = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+
+# GPU support via CubeCL (optional)
+cubecl = { workspace = true, optional = true }
+cubecl-cuda = { workspace = true, optional = true }
 
 [dev-dependencies]
-criterion = "0.5"
+criterion = { workspace = true }
 proptest = "1.5"
-anyhow = "1.0"
+anyhow = { workspace = true }
 tempfile = "3.0"
 
 [features]
 default = []
-cuda = ["candle-core/cuda"]
+cuda = ["candle-core/cuda", "dep:cubecl", "dep:cubecl-cuda"]
 
 [lints.rust]
 missing_docs = "warn"

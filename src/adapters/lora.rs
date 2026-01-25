@@ -248,6 +248,16 @@ impl LoraLayer {
     pub fn rank(&self) -> usize {
         self.config.r
     }
+
+    /// Get the LoRA A and B weight tensors.
+    ///
+    /// Returns (`lora_a`, `lora_b`) where:
+    /// - `lora_a` has shape `[r, in_features]`
+    /// - `lora_b` has shape `[out_features, r]`
+    #[must_use]
+    pub fn weights(&self) -> (&Tensor, &Tensor) {
+        (self.lora_a.weight(), self.lora_b.weight())
+    }
 }
 
 impl Adapter for LoraLayer {
