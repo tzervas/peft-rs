@@ -199,4 +199,4 @@ Contributions welcome! See [docs/GAP_ANALYSIS.md](docs/GAP_ANALYSIS.md) for plan
 
 ## License
 
-MIT Licensed ([LICENSE-MIT](LICENSE-MIT)
+MIT Licensed - see [LICENSE-MIT](LICENSE-MIT) for details.

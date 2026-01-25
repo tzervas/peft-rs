@@ -17,6 +17,17 @@ use serde::{Deserialize, Serialize};
 use crate::error::{PeftError, Result};
 use crate::traits::{Adapter, AdapterConfig, Mergeable, Trainable};
 
+fn warn_cpu_fallback(device: &Device) {
+    static WARN_ONCE: std::sync::Once = std::sync::Once::new();
+    if matches!(device, Device::Cpu) {
+        WARN_ONCE.call_once(|| {
+            eprintln!(
+                "peft-rs: CPU device in use. CUDA is the intended default; enable the 'cuda' feature and use Device::cuda_if_available(0) when possible."
+            );
+        });
+    }
+}
+
 /// Configuration for LoRA adapters.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LoraConfig {
@@ -186,6 +197,7 @@ impl LoraLayer {
         device: &Device,
     ) -> Result<Self> {
         config.validate()?;
+        warn_cpu_fallback(device);
 
         // rsLoRA uses alpha / sqrt(r) for better stability at high ranks
         let scaling = if config.use_rslora {
