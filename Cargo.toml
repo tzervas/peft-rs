@@ -18,6 +18,10 @@ safetensors = "0.4"
 thiserror = "2.0"
 tracing = "0.1"
 
+# GPU support via CubeCL (optional)
+cubecl = { version = "0.4", optional = true }
+cubecl-cuda = { version = "0.4", optional = true }
+
 [dev-dependencies]
 criterion = "0.5"
 proptest = "1.5"
@@ -26,7 +30,7 @@ tempfile = "3.0"
 
 [features]
 default = []
-cuda = ["candle-core/cuda"]
+cuda = ["candle-core/cuda", "dep:cubecl", "dep:cubecl-cuda"]
 
 [lints.rust]
 missing_docs = "warn"
