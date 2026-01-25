@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.2] - 2026-01-25
+
+### Changed
+- Migrated LoRA/DoRA GPU kernels to CubeCL 0.9 API
+- Kernel position variables now use correct types
+- Added proper usize casts at array index sites
+- `sync_cube()` replaces deprecated `sync_units()`
+- Wrapped kernel launches in unsafe blocks with SAFETY comments
+
 ## [1.0.1] - 2026-01-24
 
 ### Added
