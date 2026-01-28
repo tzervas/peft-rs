@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.3] - 2026-01-28
+
+### Changed
+- Updated safetensors dependency from 0.4 to 0.7
+- Updated candle-core and candle-nn dependencies from 0.8 to 0.9
+- Added explicit workspace.dependencies section in Cargo.toml
+
+### Fixed
+- Clippy lints for `manual_is_multiple_of` in boft.rs, lokr.rs, oft.rs
+- Clippy lint for `manual_midpoint` in training.rs
+
 ## [1.0.2] - 2026-01-25
 
 ### Changed
