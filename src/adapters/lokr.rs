@@ -129,7 +129,7 @@ impl LoKrLayer {
             // Find a reasonable factor (try to find a divisor close to sqrt)
             let target = (out_features as f64).sqrt() as usize;
             for f in (1..=target).rev() {
-                if out_features % f == 0 && in_features % f == 0 {
+                if out_features.is_multiple_of(f) && in_features.is_multiple_of(f) {
                     return f;
                 }
             }
