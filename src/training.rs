@@ -63,7 +63,7 @@ impl LrSchedule {
                     *min_lr
                 } else {
                     let progress = step as f64 / *total_steps as f64;
-                    let cosine_decay = (1.0 + (std::f64::consts::PI * progress).cos()) / 2.0;
+                    let cosine_decay = f64::midpoint(1.0, (std::f64::consts::PI * progress).cos());
                     min_lr + (base_lr - min_lr) * cosine_decay
                 }
             }

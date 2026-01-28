@@ -118,7 +118,7 @@ impl OftLayer {
     pub fn new(features: usize, config: OftConfig, device: &Device) -> Result<Self> {
         config.validate()?;
 
-        if features % config.r != 0 {
+        if !features.is_multiple_of(config.r) {
             return Err(PeftError::InvalidConfig(format!(
                 "features ({}) must be divisible by r ({})",
                 features, config.r
