@@ -46,8 +46,6 @@ pub mod adapters;
 pub mod config;
 pub mod error;
 pub mod io;
-#[cfg(feature = "cuda")]
-pub mod kernels;
 pub mod model;
 pub mod registry;
 pub mod training;

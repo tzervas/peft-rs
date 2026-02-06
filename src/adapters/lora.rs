@@ -10,11 +10,14 @@
 #![allow(clippy::cast_precision_loss)]
 #![allow(clippy::needless_pass_by_value)]
 
+use std::collections::HashMap;
+
 use candle_core::{DType, Device, Module, Tensor};
 use candle_nn::{linear_no_bias, Linear, VarBuilder, VarMap};
 use serde::{Deserialize, Serialize};
 
 use crate::error::{PeftError, Result};
+use crate::io::SaveLoad;
 use crate::traits::{Adapter, AdapterConfig, Mergeable, Trainable};
 
 fn warn_cpu_fallback(device: &Device) {
@@ -249,14 +252,34 @@ impl LoraLayer {
         self.config.r
     }
 
-    /// Get the LoRA A and B weight tensors.
-    ///
-    /// Returns (`lora_a`, `lora_b`) where:
-    /// - `lora_a` has shape `[r, in_features]`
-    /// - `lora_b` has shape `[out_features, r]`
+    /// Get the LoRA A weight tensor.
+    #[must_use]
+    pub fn lora_a_weight(&self) -> &Tensor {
+        self.lora_a.weight()
+    }
+
+    /// Get the LoRA B weight tensor.
+    #[must_use]
+    pub fn lora_b_weight(&self) -> &Tensor {
+        self.lora_b.weight()
+    }
+
+    /// Get the LoRA A and B weight tensors as a tuple.
     #[must_use]
     pub fn weights(&self) -> (&Tensor, &Tensor) {
         (self.lora_a.weight(), self.lora_b.weight())
+    }
+
+    /// Get the shape of LoRA A weight: [r, in_features].
+    #[must_use]
+    pub fn lora_a_shape(&self) -> Vec<usize> {
+        self.lora_a.weight().dims().to_vec()
+    }
+
+    /// Get the shape of LoRA B weight: [out_features, r].
+    #[must_use]
+    pub fn lora_b_shape(&self) -> Vec<usize> {
+        self.lora_b.weight().dims().to_vec()
     }
 }
 
@@ -540,11 +563,9 @@ impl Trainable for DoraLayer {
     }
 }
 
-impl crate::io::SaveLoad for LoraLayer {
+impl SaveLoad for LoraLayer {
     #[allow(clippy::similar_names)]
-    fn state_dict(&self) -> Result<std::collections::HashMap<String, Tensor>> {
-        use std::collections::HashMap;
-
+    fn state_dict(&self) -> Result<HashMap<String, Tensor>> {
         let mut state_dict = HashMap::new();
 
         // Get lora_a weight
@@ -559,10 +580,7 @@ impl crate::io::SaveLoad for LoraLayer {
     }
 
     #[allow(clippy::similar_names)]
-    fn load_state_dict(
-        &mut self,
-        state_dict: std::collections::HashMap<String, Tensor>,
-    ) -> Result<()> {
+    fn load_state_dict(&mut self, state_dict: HashMap<String, Tensor>) -> Result<()> {
         // TODO: This is a placeholder implementation that only validates tensor shapes.
         // Actual weight loading is not yet implemented because candle_nn::Linear doesn't
         // provide a way to update weights after construction. A future PR will implement
@@ -840,5 +858,52 @@ mod tests {
             b_sum > 0.0,
             "LoftQ should initialize B with non-zero values"
         );
+    }
+
+    #[test]
+    fn test_lora_gradient_flow_with_varmap() {
+        // Test that LoRA layers created with VarBuilder from VarMap receive gradients
+        let device = Device::Cpu;
+        let varmap = VarMap::new();
+
+        let config = LoraConfig {
+            r: 4,
+            alpha: 8,
+            ..Default::default()
+        };
+
+        let vb = VarBuilder::from_varmap(&varmap, DType::F32, &device);
+        let lora = LoraLayer::new(10, 10, config, vb).unwrap();
+
+        let vars = varmap.all_vars();
+        println!("Vars count: {}", vars.len());
+        for (i, v) in vars.iter().enumerate() {
+            println!(
+                "  Var {}: id={:?}, shape={:?}, is_var={}",
+                i,
+                v.id(),
+                v.shape(),
+                v.is_variable()
+            );
+        }
+
+        // Should have 2 vars: lora_a.weight and lora_b.weight
+        assert_eq!(
+            vars.len(),
+            2,
+            "Should have 2 trainable vars (A and B weights)"
+        );
+
+        let input = Tensor::randn(0f32, 1f32, (2, 10), &device).unwrap();
+        let output = lora.forward(&input, None).unwrap();
+        let loss = output.sum_all().unwrap();
+
+        let grads = loss.backward().unwrap();
+
+        for (i, v) in vars.iter().enumerate() {
+            let grad = grads.get(v);
+            println!("  Var {} grad exists: {}", i, grad.is_some());
+            assert!(grad.is_some(), "Gradient should exist for var {i}");
+        }
     }
 }

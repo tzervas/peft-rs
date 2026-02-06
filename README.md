@@ -36,14 +36,14 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-peft-rs = "0.1"
+peft-rs = "1.0"
 ```
 
 For CUDA support:
 
 ```toml
 [dependencies]
-peft-rs = { version = "0.1", features = ["cuda"] }
+peft-rs = { version = "1.0", features = ["cuda"] }
 ```
 
 ## Quick Start

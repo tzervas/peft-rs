@@ -221,7 +221,7 @@ pub trait Trainable: Adapter {
 - `candle-nn` 0.9 - Neural network layers
 - `serde` 1.0 - Serialization
 - `serde_json` 1.0 - JSON support
-- `safetensors` 0.7 - Weight persistence
+- `safetensors` 0.4 - Weight persistence
 - `thiserror` 2.0 - Error handling
 - `tracing` 0.1 - Logging
 

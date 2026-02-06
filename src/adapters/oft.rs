@@ -6,11 +6,14 @@
 //!
 //! Reference: <https://arxiv.org/abs/2306.07280>
 
+use std::collections::HashMap;
+
 use candle_core::{Device, IndexOp, Tensor};
 use candle_nn::VarMap;
 use serde::{Deserialize, Serialize};
 
 use crate::error::{PeftError, Result};
+use crate::io::SaveLoad;
 use crate::traits::{Adapter, AdapterConfig, Mergeable, Trainable};
 
 /// Configuration for OFT adapters.
@@ -387,6 +390,22 @@ impl Trainable for OftLayer {
 
     fn is_frozen(&self) -> bool {
         self.frozen
+    }
+}
+
+impl SaveLoad for OftLayer {
+    fn state_dict(&self) -> Result<HashMap<String, Tensor>> {
+        let mut state_dict = HashMap::new();
+        // Save the orthogonal R matrix parameters
+        state_dict.insert("oft_r".to_string(), self.oft_r.clone());
+        Ok(state_dict)
+    }
+
+    fn load_state_dict(&mut self, state_dict: HashMap<String, Tensor>) -> Result<()> {
+        if let Some(oft_r) = state_dict.get("oft_r") {
+            self.oft_r = oft_r.clone();
+        }
+        Ok(())
     }
 }
 

@@ -7,26 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.0.3] - 2026-01-28
-
-### Changed
-- Updated safetensors dependency from 0.4 to 0.7
-- Updated candle-core and candle-nn dependencies from 0.8 to 0.9
-- Added explicit workspace.dependencies section in Cargo.toml
-
-### Fixed
-- Clippy lints for `manual_is_multiple_of` in boft.rs, lokr.rs, oft.rs
-- Clippy lint for `manual_midpoint` in training.rs
-
-## [1.0.2] - 2026-01-25
-
-### Changed
-- Migrated LoRA/DoRA GPU kernels to CubeCL 0.9 API
-- Kernel position variables now use correct types
-- Added proper usize casts at array index sites
-- `sync_cube()` replaces deprecated `sync_units()`
-- Wrapped kernel launches in unsafe blocks with SAFETY comments
-
 ## [1.0.1] - 2026-01-24
 
 ### Added
@@ -74,6 +54,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Clippy lint fixes for Rust 1.92 compatibility
+
 ## [0.4.0] - 2026-01-09
 
 ### Added
@@ -132,7 +113,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Configuration system
 - Initial documentation (README, AGENT_GUIDE, GAP_ANALYSIS, TASK_TRACKER)
 
-[Unreleased]: https://github.com/tzervas/peft-rs/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/tzervas/peft-rs/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/tzervas/peft-rs/compare/v0.4.1...v1.0.0
+[0.4.1]: https://github.com/tzervas/peft-rs/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/tzervas/peft-rs/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/tzervas/peft-rs/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/tzervas/peft-rs/compare/v0.1.0...v0.2.0

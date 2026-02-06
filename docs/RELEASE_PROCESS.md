@@ -2,7 +2,7 @@
 
 ## Publication Information
 
-**Crates.io**: Ready for publication as early alpha/beta  
+**Crates.io**: Published as stable release (1.0.0)
 **Maintainer**: Tyler Zervas (tzervas)  
 **Contact**: tz-dev@vectorweight.com  
 **GPG Key**: Required for all releases
@@ -19,7 +19,7 @@
 ### Version Management
 - [ ] Version bumped in `Cargo.toml`
 - [ ] `CHANGELOG.md` updated with all changes
-- [ ] Git tag created: `v0.X.Y`
+- [ ] Git tag created: `vX.Y.Z`
 - [ ] All changes committed to appropriate branch
 
 ### Branch Workflow
@@ -60,13 +60,13 @@ Username: tzervas
 
 ```bash
 # Create signed release tag
-git tag -s v0.4.0 -m "Release v0.4.0: Quality & Tooling Phase"
+git tag -s v1.0.0 -m "Release v1.0.0: Stable Release"
 
 # Verify tag signature
-git tag -v v0.4.0
+git tag -v v1.0.0
 
 # Push tag to remote
-git push origin v0.4.0
+git push origin v1.0.0
 ```
 
 ## Publishing to Crates.io
@@ -85,17 +85,14 @@ cargo package --list
 
 # Verify the package
 cargo package
-tar -tzf target/package/peft-rs-0.4.0.crate
+tar -tzf target/package/peft-rs-1.0.0.crate
 ```
 
 ### Publication Commands
 
-#### Alpha/Beta Releases (Pre-1.0)
+#### Publishing Releases
 
 ```bash
-# All versions before 1.0.0 are considered unstable
-# Current: 0.4.0 = alpha quality
-
 # Publish to crates.io
 cargo publish
 
@@ -104,14 +101,9 @@ cargo search peft-rs
 ```
 
 #### Version Naming Convention
-- **0.1.x - 0.3.x**: Early development
-- **0.4.x**: Quality improvements, production-ready code structure
-- **0.5.x**: Quantization support
-- **0.6.x**: Enhanced inference
-- **0.7.x**: Test optimization
-- **0.8.x**: Performance optimization
-- **0.9.x**: Pre-1.0 stabilization
-- **1.0.0**: Stable API (requires explicit authorization)
+- **1.0.x**: Stable API with all core PEFT adapters
+- **1.x.y**: Backward-compatible feature additions and bug fixes
+- **2.0.0+**: Future major versions with potential breaking changes
 
 ### Post-Publication
 
@@ -123,8 +115,8 @@ cargo search peft-rs
 2. **Create GitHub Release**:
    ```bash
    # Using GitHub CLI
-   gh release create v0.4.0 \
-     --title "v0.4.0 - Quality & Tooling" \
+   gh release create v1.0.0 \
+     --title "v1.0.0 - Stable Release" \
      --notes-file RELEASE_NOTES.md
    ```
 
@@ -135,73 +127,53 @@ cargo search peft-rs
 
 ## Release Types
 
-### Alpha Releases (0.1.x - 0.4.x)
-- Early testing
-- API may change
-- Limited documentation
-- Core features implemented
-
-**Current Status**: 0.4.0 = **Ready for alpha publication**
-
-### Beta Releases (0.5.x - 0.8.x)
-- Feature complete
-- API mostly stable
-- Comprehensive documentation
-- Production testing
-
-### Release Candidates (0.9.x)
-- API frozen
-- Only bug fixes
-- Final testing
-- Documentation complete
-
 ### Stable Release (1.0.0+)
 - API stability guarantee
 - Full documentation
 - Production validated
-- Requires explicit authorization
+- All core PEFT adapters implemented
+
+**Current Status**: 1.0.0 = **Stable release**
+
+### Patch Releases (1.0.x)
+- Bug fixes only
+- No API changes
+- Backward compatible
+
+### Minor Releases (1.x.0)
+- New features
+- Backward compatible
+- API additions only
 
 ## Emergency Procedures
 
 ### Yanking a Release
 ```bash
 # If critical bug found
-cargo yank --vers 0.4.0
+cargo yank --vers 1.0.0
 
 # To un-yank (if fixed quickly)
-cargo yank --vers 0.4.0 --undo
+cargo yank --vers 1.0.0 --undo
 ```
 
 ### Publishing Patches
 ```bash
 # For critical fixes
-# Version: 0.4.0 → 0.4.1
+# Version: 1.0.0 -> 1.0.1
 cargo publish
 ```
 
 ## Current Publication Status
 
-### Version 0.4.0
-**Status**: ✅ Ready for alpha publication to crates.io
+### Version 1.0.0
+**Status**: Published as stable release
 
 **Checklist**:
-- ✅ Code quality: All clippy warnings fixed
-- ✅ Tests: 124 tests passing
-- ✅ Documentation: Comprehensive docs added
-- ✅ Security: No known vulnerabilities
-- ✅ Authentication: Cargo login configured
-- ⏳ Pending: PR merge to dev → testing → main
-- ⏳ Pending: GPG signed tag creation
-
-**Publication Steps**:
-1. Merge `working/quality-clippy-fixes` PR to `dev`
-2. Merge `dev` to `testing` for validation
-3. Merge `testing` to `main`
-4. Create GPG signed tag: `v0.4.0`
-5. Push tag to GitHub
-6. Publish to crates.io: `cargo publish`
-7. Create GitHub release with notes
-8. Update README badges
+- All clippy warnings fixed
+- 128 tests passing
+- Comprehensive documentation
+- All core PEFT adapters implemented
+- Published to crates.io
 
 ## Automation Considerations
 
@@ -228,7 +200,8 @@ jobs:
 | 0.1.0 | 2026-01-06 | Dev | No | Initial adapters |
 | 0.2.0 | 2026-01-07 | Dev | No | Additional adapters |
 | 0.3.0 | 2026-01-08 | Dev | No | Infrastructure complete |
-| 0.4.0 | 2026-01-09 | Alpha | Pending | Quality & tooling |
+| 0.4.0 | 2026-01-09 | Alpha | No | Quality & tooling |
+| 1.0.0 | 2026-01-24 | Stable | Yes | Stable release |
 
 ## References
 
@@ -239,5 +212,4 @@ jobs:
 
 ---
 
-**Note**: This is an early alpha library. APIs may change before 1.0.0.  
-Production use is at your own risk until stable release.
+**Note**: This is a stable 1.0.0 release with API stability guarantees.

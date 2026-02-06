@@ -11,11 +11,14 @@
 #![allow(clippy::cast_precision_loss)]
 #![allow(clippy::cast_sign_loss)]
 
+use std::collections::HashMap;
+
 use candle_core::{Device, Tensor};
 use candle_nn::VarMap;
 use serde::{Deserialize, Serialize};
 
 use crate::error::{PeftError, Result};
+use crate::io::SaveLoad;
 use crate::traits::{Adapter, AdapterConfig, Mergeable, Trainable};
 
 /// Configuration for LoKr adapters.
@@ -298,6 +301,29 @@ impl Trainable for LoKrLayer {
 
     fn is_frozen(&self) -> bool {
         self.frozen
+    }
+}
+
+impl SaveLoad for LoKrLayer {
+    fn state_dict(&self) -> Result<HashMap<String, Tensor>> {
+        let mut state_dict = HashMap::new();
+        state_dict.insert("lokr_w1".to_string(), self.lokr_w1.clone());
+        state_dict.insert("lokr_w2_a".to_string(), self.lokr_w2_a.clone());
+        state_dict.insert("lokr_w2_b".to_string(), self.lokr_w2_b.clone());
+        Ok(state_dict)
+    }
+
+    fn load_state_dict(&mut self, state_dict: HashMap<String, Tensor>) -> Result<()> {
+        if let Some(lokr_w1) = state_dict.get("lokr_w1") {
+            self.lokr_w1 = lokr_w1.clone();
+        }
+        if let Some(lokr_w2_a) = state_dict.get("lokr_w2_a") {
+            self.lokr_w2_a = lokr_w2_a.clone();
+        }
+        if let Some(lokr_w2_b) = state_dict.get("lokr_w2_b") {
+            self.lokr_w2_b = lokr_w2_b.clone();
+        }
+        Ok(())
     }
 }
 

@@ -14,11 +14,14 @@
 #![allow(clippy::cast_sign_loss)]
 #![allow(clippy::uninlined_format_args)]
 
+use std::collections::HashMap;
+
 use candle_core::{DType, Device, Tensor};
 use candle_nn::VarMap;
 use serde::{Deserialize, Serialize};
 
 use crate::error::{PeftError, Result};
+use crate::io::SaveLoad;
 use crate::traits::{Adapter, AdapterConfig, Mergeable, Trainable};
 
 /// Configuration for AdaLoRA adapters.
@@ -253,7 +256,7 @@ impl AdaLoraLayer {
     /// Update the rank mask based on importance scores.
     ///
     /// # Arguments
-    /// * `importance_scores` - Importance score for each rank [init_r]
+    /// * `importance_scores` - Importance score for each rank (length: `init_r`)
     /// * `budget` - Number of ranks to keep
     ///
     /// # Errors
@@ -436,6 +439,33 @@ impl Trainable for AdaLoraLayer {
 
     fn is_frozen(&self) -> bool {
         self.frozen
+    }
+}
+
+impl SaveLoad for AdaLoraLayer {
+    fn state_dict(&self) -> Result<HashMap<String, Tensor>> {
+        let mut state_dict = HashMap::new();
+        state_dict.insert("lora_e".to_string(), self.lora_e.clone());
+        state_dict.insert("lora_a".to_string(), self.lora_a.clone());
+        state_dict.insert("lora_b".to_string(), self.lora_b.clone());
+        state_dict.insert("rank_mask".to_string(), self.rank_mask.clone());
+        Ok(state_dict)
+    }
+
+    fn load_state_dict(&mut self, state_dict: HashMap<String, Tensor>) -> Result<()> {
+        if let Some(t) = state_dict.get("lora_e") {
+            self.lora_e = t.clone();
+        }
+        if let Some(t) = state_dict.get("lora_a") {
+            self.lora_a = t.clone();
+        }
+        if let Some(t) = state_dict.get("lora_b") {
+            self.lora_b = t.clone();
+        }
+        if let Some(t) = state_dict.get("rank_mask") {
+            self.rank_mask = t.clone();
+        }
+        Ok(())
     }
 }
 
