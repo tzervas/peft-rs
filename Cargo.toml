@@ -11,17 +11,17 @@ keywords = ["peft", "lora", "machine-learning", "fine-tuning", "llm"]
 categories = ["science"]
 
 [dependencies]
-candle-core = "0.9"
-candle-nn = "0.9"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-safetensors = "0.7"
-thiserror = "2.0"
-tracing = "0.1"
+candle-core = { workspace = true }
+candle-nn = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+safetensors = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
 
 [dev-dependencies]
-criterion = "0.5"
-proptest = "1.5"
+criterion = { workspace = true }
+proptest = { workspace = true }
 anyhow = "1.0"
 tempfile = "3.0"
 
@@ -29,13 +29,8 @@ tempfile = "3.0"
 default = []
 cuda = ["candle-core/cuda"]
 
-[lints.rust]
-missing_docs = "warn"
-
-[lints.clippy]
-pedantic = { level = "warn", priority = -1 }
-missing_errors_doc = "allow"
-must_use_candidate = "allow"
+[lints]
+workspace = true
 
 [[bench]]
 name = "adapters"
