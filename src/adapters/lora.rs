@@ -581,26 +581,18 @@ impl SaveLoad for LoraLayer {
 
     #[allow(clippy::similar_names)]
     fn load_state_dict(&mut self, state_dict: HashMap<String, Tensor>) -> Result<()> {
-        // TODO: This is a placeholder implementation that only validates tensor shapes.
-        // Actual weight loading is not yet implemented because candle_nn::Linear doesn't
-        // provide a way to update weights after construction. A future PR will implement
-        // full weight loading by recreating the Linear layers with the loaded tensors
-        // using Linear::new(weight, None).
-        //
-        // For now, this implementation:
-        // 1. Validates that required keys exist in the state dict
-        // 2. Verifies that tensor shapes match the expected dimensions
-        // 3. Returns success if validation passes (weights are not actually loaded)
-
         if !state_dict.contains_key("lora_a.weight") || !state_dict.contains_key("lora_b.weight") {
             return Err(PeftError::WeightLoad(
                 "Missing required keys in state_dict".to_string(),
             ));
         }
 
+        let lora_a_weight = state_dict.get("lora_a.weight").unwrap().clone();
+        let lora_b_weight = state_dict.get("lora_b.weight").unwrap().clone();
+
         // Verify shapes match
-        let lora_a_shape = state_dict["lora_a.weight"].dims();
-        let lora_b_shape = state_dict["lora_b.weight"].dims();
+        let lora_a_shape = lora_a_weight.dims();
+        let lora_b_shape = lora_b_weight.dims();
 
         if lora_a_shape != [self.config.r, self.in_features] {
             return Err(PeftError::ShapeMismatch {
@@ -615,6 +607,10 @@ impl SaveLoad for LoraLayer {
                 actual: lora_b_shape.to_vec(),
             });
         }
+
+        // Reconstruct Linear layers with the loaded tensors
+        self.lora_a = Linear::new(lora_a_weight, None);
+        self.lora_b = Linear::new(lora_b_weight, None);
 
         Ok(())
     }
@@ -734,6 +730,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::similar_names)]
     fn test_lora_save_load_weights() -> Result<()> {
         use crate::io::{load_adapter_weights, save_adapter_weights, SaveLoad};
         use tempfile::TempDir;
@@ -772,10 +769,23 @@ mod tests {
             original_state["lora_b.weight"].dims()
         );
 
-        // Note: We don't compare actual tensor values here because the current
-        // load_state_dict implementation doesn't actually load weights into the
-        // Linear layers (see TODO in load_state_dict implementation).
-        // A future PR will implement full weight loading functionality.
+        // Compare actual tensor values to verify full weight loading
+        let original_a_sum = original_state["lora_a.weight"].sum_all()?.to_scalar::<f32>()?;
+        let loaded_a_sum = loaded_state["lora_a.weight"].sum_all()?.to_scalar::<f32>()?;
+        assert!((original_a_sum - loaded_a_sum).abs() < 1e-5);
+
+        let original_b_sum = original_state["lora_b.weight"].sum_all()?.to_scalar::<f32>()?;
+        let loaded_b_sum = loaded_state["lora_b.weight"].sum_all()?.to_scalar::<f32>()?;
+        assert!((original_b_sum - loaded_b_sum).abs() < 1e-5);
+
+        // Verify that forward pass results match perfectly
+        let test_input = Tensor::randn(0f32, 1f32, (1, 10, 768), &device)?;
+        let original_output = layer.forward(&test_input, None)?;
+        let loaded_output = loaded_layer.forward(&test_input, None)?;
+
+        let original_output_sum = original_output.sum_all()?.to_scalar::<f32>()?;
+        let loaded_output_sum = loaded_output.sum_all()?.to_scalar::<f32>()?;
+        assert!((original_output_sum - loaded_output_sum).abs() < 1e-5);
 
         Ok(())
     }

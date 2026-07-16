@@ -1,10 +1,12 @@
-//! Basic LoRA adapter usage example.
+//! Basic `LoRA` adapter usage example.
 //!
 //! This example demonstrates:
-//! - Creating a LoRA configuration
-//! - Initializing a LoRA layer
+//! - Creating a `LoRA` configuration
+//! - Initializing a `LoRA` layer
 //! - Performing a forward pass with a tensor
 //! - Inspecting shapes and parameter counts
+
+#![allow(clippy::cast_precision_loss)]
 
 use anyhow::Result;
 use candle_core::{Device, Tensor};
@@ -44,26 +46,20 @@ fn main() -> Result<()> {
     // Print parameter information
     let num_params = lora_layer.num_parameters();
     println!("Layer Information:");
-    println!("  Input features: {}", in_features);
-    println!("  Output features: {}", out_features);
-    println!("  Total trainable parameters: {}", num_params);
+    println!("  Input features: {in_features}");
+    println!("  Output features: {out_features}");
+    println!("  Total trainable parameters: {num_params}");
     println!(
-        "  Parameter breakdown: A({} × {}) + B({} × {}) = {} + {} = {}",
-        in_features,
-        8,
-        8,
-        out_features,
+        "  Parameter breakdown: A({in_features} × 8) + B(8 × {out_features}) = {} + {} = {num_params}",
         in_features * 8,
-        8 * out_features,
-        num_params
+        8 * out_features
     );
 
     // Calculate parameter reduction compared to full fine-tuning
     let full_params = in_features * out_features;
     let reduction_ratio = full_params as f64 / num_params as f64;
     println!(
-        "  Compared to full fine-tuning: {:.2}x parameter reduction\n",
-        reduction_ratio
+        "  Compared to full fine-tuning: {reduction_ratio:.2}x parameter reduction\n"
     );
 
     // Create a sample input tensor

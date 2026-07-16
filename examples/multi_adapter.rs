@@ -1,8 +1,8 @@
 //! Multi-adapter registry example.
 //!
 //! This example demonstrates:
-//! - Creating multiple adapters (LoRA and IA3)
-//! - Registering them with AdapterRegistry
+//! - Creating multiple adapters (`LoRA` and `IA3`)
+//! - Registering them with `AdapterRegistry`
 //! - Switching between adapters at runtime
 //! - Performing forward passes with different active adapters
 
@@ -147,8 +147,10 @@ fn main() -> Result<()> {
     println!("\n=== Summary ===");
     println!("✓ Successfully created and registered multiple adapters");
     println!("✓ Demonstrated adapter switching with AdapterRegistry");
-    println!("✓ LoRA registry has {} adapters", lora_registry.len());
-    println!("✓ IA3 registry has {} adapter", ia3_registry.len());
+    let lora_len = lora_registry.len();
+    println!("✓ LoRA registry has {lora_len} adapters");
+    let ia3_len = ia3_registry.len();
+    println!("✓ IA3 registry has {ia3_len} adapter");
     println!(
         "✓ All outputs have correct shape: {:?}",
         output1.shape().dims()
