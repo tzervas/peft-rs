@@ -46,14 +46,8 @@ pub trait SaveLoad {
 pub fn save_adapter_weights<P: AsRef<Path>>(adapter: &dyn SaveLoad, path: P) -> Result<()> {
     let state_dict = adapter.state_dict()?;
 
-    // Convert HashMap to Vec for safetensors
-    let tensors: Vec<(&str, Tensor)> = state_dict
-        .iter()
-        .map(|(name, tensor)| (name.as_str(), tensor.clone()))
-        .collect();
-
     // Use candle's built-in safetensors serialization
-    safetensors::tensor::serialize_to_file(tensors, None, path.as_ref())
+    candle_core::safetensors::save(&state_dict, path.as_ref())
         .map_err(|e| PeftError::Io(format!("Failed to save safetensors: {e}")))?;
 
     Ok(())
