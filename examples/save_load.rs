@@ -9,7 +9,9 @@
 
 use anyhow::Result;
 use candle_core::{Device, Tensor};
-use peft_rs::{load_adapter_weights, save_adapter_weights, Adapter, LoraConfig, LoraLayer, SaveLoad};
+use peft_rs::{
+    load_adapter_weights, save_adapter_weights, Adapter, LoraConfig, LoraLayer, SaveLoad,
+};
 use tempfile::TempDir;
 
 fn main() -> Result<()> {
@@ -43,12 +45,11 @@ fn main() -> Result<()> {
 
     println!("Step 1: Creating original adapter");
 
-    let original_adapter = LoraLayer::new_with_zeros(in_features, out_features, config.clone(), &device)?;
+    let original_adapter =
+        LoraLayer::new_with_zeros(in_features, out_features, config.clone(), &device)?;
 
     let original_params = original_adapter.num_parameters();
-    println!(
-        "  Created adapter with {original_params} parameters"
-    );
+    println!("  Created adapter with {original_params} parameters");
 
     // Create sample input for testing
     let test_input = Tensor::randn(0f32, 1f32, (1, 4, in_features), &device)?;
@@ -154,9 +155,7 @@ fn main() -> Result<()> {
     for (name, tensor) in &state_dict {
         let dims = tensor.shape().dims();
         let dtype = tensor.dtype();
-        println!(
-            "    - {name}: shape={dims:?}, dtype={dtype:?}"
-        );
+        println!("    - {name}: shape={dims:?}, dtype={dtype:?}");
     }
 
     // ============================================================================

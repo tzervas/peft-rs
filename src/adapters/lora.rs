@@ -770,12 +770,20 @@ mod tests {
         );
 
         // Compare actual tensor values to verify full weight loading
-        let original_a_sum = original_state["lora_a.weight"].sum_all()?.to_scalar::<f32>()?;
-        let loaded_a_sum = loaded_state["lora_a.weight"].sum_all()?.to_scalar::<f32>()?;
+        let original_a_sum = original_state["lora_a.weight"]
+            .sum_all()?
+            .to_scalar::<f32>()?;
+        let loaded_a_sum = loaded_state["lora_a.weight"]
+            .sum_all()?
+            .to_scalar::<f32>()?;
         assert!((original_a_sum - loaded_a_sum).abs() < 1e-5);
 
-        let original_b_sum = original_state["lora_b.weight"].sum_all()?.to_scalar::<f32>()?;
-        let loaded_b_sum = loaded_state["lora_b.weight"].sum_all()?.to_scalar::<f32>()?;
+        let original_b_sum = original_state["lora_b.weight"]
+            .sum_all()?
+            .to_scalar::<f32>()?;
+        let loaded_b_sum = loaded_state["lora_b.weight"]
+            .sum_all()?
+            .to_scalar::<f32>()?;
         assert!((original_b_sum - loaded_b_sum).abs() < 1e-5);
 
         // Verify that forward pass results match perfectly

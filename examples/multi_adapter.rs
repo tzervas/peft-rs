@@ -40,7 +40,8 @@ fn main() -> Result<()> {
         dropout: 0.0,
         ..Default::default()
     };
-    let lora_small = LoraLayer::new_with_zeros(in_features, out_features, lora_config_small, &device)?;
+    let lora_small =
+        LoraLayer::new_with_zeros(in_features, out_features, lora_config_small, &device)?;
     println!(
         "  lora_small: rank={}, params={}",
         4,
@@ -54,7 +55,8 @@ fn main() -> Result<()> {
         dropout: 0.0,
         ..Default::default()
     };
-    let lora_large = LoraLayer::new_with_zeros(in_features, out_features, lora_config_large, &device)?;
+    let lora_large =
+        LoraLayer::new_with_zeros(in_features, out_features, lora_config_large, &device)?;
     println!(
         "  lora_large: rank={}, params={}",
         16,

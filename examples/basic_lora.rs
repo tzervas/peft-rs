@@ -36,7 +36,10 @@ fn main() -> Result<()> {
     println!("LoRA Configuration:");
     println!("  Rank (r): {}", config.r);
     println!("  Alpha: {}", config.alpha);
-    println!("  Scaling factor: {}", config.alpha as f64 / config.r as f64);
+    println!(
+        "  Scaling factor: {}",
+        config.alpha as f64 / config.r as f64
+    );
     println!("  Dropout: {}\n", config.dropout);
 
     // Create a LoRA layer
@@ -58,9 +61,7 @@ fn main() -> Result<()> {
     // Calculate parameter reduction compared to full fine-tuning
     let full_params = in_features * out_features;
     let reduction_ratio = full_params as f64 / num_params as f64;
-    println!(
-        "  Compared to full fine-tuning: {reduction_ratio:.2}x parameter reduction\n"
-    );
+    println!("  Compared to full fine-tuning: {reduction_ratio:.2}x parameter reduction\n");
 
     // Create a sample input tensor
     // Shape: [batch_size, sequence_length, hidden_dim]
