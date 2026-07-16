@@ -17,7 +17,7 @@ env:
 jobs:
   build-and-test:
     name: Build and Test
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, podman]
     steps:
       # For tag push: checkout the tag ref
       # For manual dispatch: checkout default branch (tag doesn't exist yet)
@@ -61,7 +61,7 @@ jobs:
 
   publish-crates:
     name: Publish to crates.io
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, podman]
     needs: build-and-test
     if: vars.ENABLE_CRATES_PUBLISH == 'true'
     steps:
@@ -76,7 +76,7 @@ jobs:
 
   github-release:
     name: Create GitHub Release
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, podman]
     needs: build-and-test
     permissions:
       contents: write
