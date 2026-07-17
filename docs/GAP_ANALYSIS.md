@@ -125,9 +125,9 @@ Implemented in `src/training.rs`:
 - ~~Learning rate scheduling for adapters~~ ✅
 
 #### Evaluation/Inference
-- Batch adapter switching
-- Merged inference mode
-- Export to standard formats
+- [x] Batch adapter switching (Implemented via `BatchAdapterSwitcher` in `src/inference.rs`)
+- [x] Merged inference mode (Supported via `InferenceMode::Merged` in `src/inference.rs` and `Mergeable` trait implementations)
+- [ ] Export to standard formats
 
 ## Recommended Implementation Order
 
