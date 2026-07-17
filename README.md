@@ -1,5 +1,10 @@
 # peft-rs
 
+<!-- FLEET-BADGES:BEGIN -->
+[![CI](https://github.com/tzervas/peft-rs/actions/workflows/fleet-ci.yml/badge.svg?branch=main)](https://github.com/tzervas/peft-rs/actions/workflows/fleet-ci.yml?query=branch%3Amain)
+[![Security](https://github.com/tzervas/peft-rs/actions/workflows/fleet-security.yml/badge.svg?branch=main)](https://github.com/tzervas/peft-rs/actions/workflows/fleet-security.yml?query=branch%3Amain)
+<!-- FLEET-BADGES:END -->
+
 Comprehensive PEFT (Parameter-Efficient Fine-Tuning) adapter library for Rust.
 
 [![Crates.io](https://img.shields.io/crates/v/peft-rs.svg)](https://crates.io/crates/peft-rs)
