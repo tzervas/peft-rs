@@ -154,11 +154,11 @@ impl AdapterConfig for AdaLoraConfig {
 ///
 /// This allows for dynamic rank allocation by zeroing out singular values.
 pub struct AdaLoraLayer {
-    /// Left singular vectors: [out_features, init_r]
+    /// Left singular vectors: `[out_features, init_r]`
     lora_a: Tensor,
-    /// Singular values: [init_r]
+    /// Singular values: `[init_r]`
     lora_e: Tensor,
-    /// Right singular vectors: [init_r, in_features]
+    /// Right singular vectors: `[init_r, in_features]`
     lora_b: Tensor,
     /// Scaling factor
     scaling: f64,
