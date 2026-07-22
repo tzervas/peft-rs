@@ -12,17 +12,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - **Skew heal (SoT):** package version set to **1.0.4**, intentionally superseding crates.io / tag **1.0.3** as the forward Source of Truth (see `DECISION.md`).
 - Local tree was already a descendant of `v1.0.3` but had regressed `Cargo.toml` to 1.0.1 during workspace/fleet merges; version field corrected without resetting history.
-- `cuda` feature remains **candle-core/cuda only** on this tree (no optional `cubecl` / `cubecl-cuda` deps). Fused GPU kernels under `src/kernels/` stay on disk but are **not** exported from `lib.rs` pending PR-021 (rewire or quarantine).
+- `cuda` feature remains **candle-core/cuda only** on this tree (no optional `cubecl` / `cubecl-cuda` deps).
+- **PR-021 kernels:** fused CubeCL sources **quarantined** under `src/kernels/archive/`; not exported from `lib.rs`; not compiled. README documents no active fused kernels.
+- **PR-010 docs honesty:** README product class = Candle PEFT adapter **layer library**; honest status matrix; roadmap no longer claims “success criteria already met”; `METRICS.md` scaffold added.
+- **PR-020 flags honesty:**
+  - LoRA `dropout` applied in forward when the layer is unfrozen and `dropout > 0`
+  - `loftq_iterations` documented as **simplified dual-Gaussian init**, not full SVD/quant LoftQ
+  - `Trainable::freeze` documented as a layer flag (gates dropout; does not detach Vars)
+  - `DoraLayer` implements `SaveLoad` (lora weights + magnitude)
 
 ### Added
 - `DECISION.md` — formal restore-vs-supersede decision for ECO-P0-03 / PEFT-P0-02.
+- `METRICS.md` — HF peft comparison scaffold (methods listed; numbers not yet measured).
+- `src/kernels/archive/README.md` — quarantine notice for historical kernel sources.
 
 ### Fixed
 - Restored missing changelog sections for **1.0.2** and **1.0.3** that were dropped after the 1.0.3 publish line.
+- Corrected historical overclaims about LoftQ “100% Python PEFT parity” and incomplete DoRA SaveLoad notes (see 1.0.0 errata below).
 
 ### Notes
-- Full README / roadmap honesty reset → **PR-010**.
-- Kernels / CubeCL feature truth → **PR-021**.
 - Do not treat crates.io 1.0.3 as SoT for future commits; publish next from this tree as 1.0.4+.
 
 ## [1.0.3] - 2026-01-28
@@ -58,23 +66,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.0.0] - 2026-01-24
 
 ### Added
-- **SaveLoad trait implementations for all 11 adapters** - Complete persistence support
-  - LoraLayer, DoraLayer (lora.rs)
-  - AdaLoraLayer (adalora.rs)
-  - Ia3Layer (ia3.rs)
-  - LoHaLayer (loha.rs)
-  - LoKrLayer (lokr.rs)
-  - OftLayer (oft.rs)
-  - BoftLayer (boft.rs) - already existed
-  - VeraLayer (vera.rs)
-  - PrefixTuningLayer (prefix_tuning.rs)
-  - PromptTuningLayer (prompt_tuning.rs)
+- **SaveLoad trait implementations for adapters** - Persistence support for:
+  - LoraLayer (lora.rs) — **done at 1.0.0**
+  - DoraLayer — **was claimed here but missing until 1.0.4** (implemented in PR-020)
+  - AdaLoraLayer, Ia3Layer, LoHaLayer, LoKrLayer, OftLayer, BoftLayer, VeraLayer
+  - PrefixTuningLayer, PromptTuningLayer
 - **Examples directory** with 3 runnable examples:
   - `basic_lora.rs` - Simple LoRA adapter usage
   - `multi_adapter.rs` - Using AdapterRegistry with multiple adapters
   - `save_load.rs` - Persisting and loading adapter weights
 - `weights()` method for LoRA adapters (from 0.4.1)
-- rsLoRA and LoftQ support for 100% Python PEFT parity
+- rsLoRA scaling (`use_rslora`) and a **simplified** `loftq_iterations` init path
+  - **Errata:** 1.0.0 marketing text claimed “LoftQ support for 100% Python PEFT parity”.
+    That was **false**. Full LoftQ (SVD + quantization residual iterations on base weights)
+    is **not** implemented; `loftq_iterations > 0` only selects dual-Gaussian A/B init.
 - CLAUDE.md for Claude Code development workflow
 
 ### Fixed
@@ -83,7 +88,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Bumped to stable 1.0.0 release
-- All 128 tests passing
+- All 128 tests passing (at release cut)
 - Full clippy compliance with pedantic lints
 
 ## [0.4.1] - 2026-01-16
@@ -152,7 +157,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Configuration system
 - Initial documentation (README, AGENT_GUIDE, GAP_ANALYSIS, TASK_TRACKER)
 
-[Unreleased]: https://github.com/tzervas/peft-rs/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/tzervas/peft-rs/compare/v1.0.4...HEAD
+[1.0.4]: https://github.com/tzervas/peft-rs/compare/v1.0.3...v1.0.4
+[1.0.3]: https://github.com/tzervas/peft-rs/compare/v1.0.2...v1.0.3
+[1.0.2]: https://github.com/tzervas/peft-rs/compare/v1.0.1...v1.0.2
+[1.0.1]: https://github.com/tzervas/peft-rs/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/tzervas/peft-rs/compare/v0.4.1...v1.0.0
 [0.4.1]: https://github.com/tzervas/peft-rs/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/tzervas/peft-rs/compare/v0.3.0...v0.4.0

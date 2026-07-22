@@ -92,3 +92,13 @@ Treat **this tree as Source of Truth**. Bump package version **past** crates.io 
 - Do not force-push tags or rewrite `v1.0.3`.
 - Do not re-enable CubeCL in this PR.
 - Do not rewrite README parity tables here (PR-010).
+
+
+---
+
+## PR-021 resolution (2026-07-22)
+
+**Choice: B — quarantine.** CubeCL fused sources moved to `src/kernels/archive/`.
+They are not exported from `lib.rs`, not compiled, and the `cuda` feature remains
+candle-core CUDA only. Restoring fused kernels requires a future optional CubeCL
+feature with CI proof (PEFT-P1-05).
