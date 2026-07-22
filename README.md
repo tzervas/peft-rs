@@ -15,8 +15,11 @@ Candle PEFT **adapter layer library** for Rust.
 > [candle](https://github.com/huggingface/candle) (forward / merge / safetensors)
 > plus a **Linear inject path** (`LinearWithLora` / `get_peft_model`).
 > This is **not** a drop-in HuggingFace PEFT framework and does **not** claim full
-> Python parity for every tuner. See [METRICS.md](METRICS.md) and [roadmap.md](roadmap.md).
-
+> Python parity for every tuner.
+>
+> **Docs:** [METRICS.md](METRICS.md) · [roadmap.md](roadmap.md) · [CHANGELOG.md](CHANGELOG.md) ·
+> [docs/TASK_TRACKER.md](docs/TASK_TRACKER.md) · [docs/GAP_ANALYSIS.md](docs/GAP_ANALYSIS.md) ·
+> [docs/DEPENDENCIES.md](docs/DEPENDENCIES.md) (no circular deps)
 ## What this crate is
 
 - Standalone adapter **layers** (LoRA, DoRA, AdaLoRA, IA³, LoHa, LoKr, OFT, BOFT, VeRA, prefix/prompt tuning)

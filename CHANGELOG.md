@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Documentation
+- Refreshed `docs/TASK_TRACKER.md` and `docs/GAP_ANALYSIS.md` for **1.1.0** truth (no stale “stub inject” rows).
+- Added `docs/DEPENDENCIES.md` (foundation crate; no sister deps; no cycles).
+
 ## [1.1.0] - 2026-07-22
 
 ### Added
