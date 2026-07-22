@@ -7,6 +7,104 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-07-22
+
+### Added
+- **PR-040 HF adapter I/O**
+  - `hf` module: `HfLoraConfig` (`peft_type`, `r`, `lora_alpha`, `target_modules`,
+    optional `base_model_name_or_path` / `task_type`, `modules_to_save` config-only)
+  - HF LoRA key styles: native, `lora_A.default.weight`, module-prefixed, `base_model.model.*`
+  - `save_pretrained_hf` / `load_pretrained_hf`, `extract_lora_ab`, key rewrite helpers
+  - `LoraLayer::load_state_dict` accepts HF or native keys
+  - Tests: `tests/hf_roundtrip.rs` + unit tests in `hf`
+- **PR-041 real inject path**
+  - `LinearWithLora` — base `candle_nn::Linear` + `LoraLayer` residual with real forward
+  - `PeftLinearModel` / `get_peft_model(base_modules, pattern, config, name, vb)` product path
+  - Legacy name-list API renamed to `get_peft_model_registry`
+  - Example `examples/lora_inject_train.rs` — multi-layer MLP + AdamW adapter updates (base frozen)
+  - Integration test `tests/inject_train.rs`
+  - `modules_to_save` policy documented as config-only non-goal for auto-training
+- **PR-042 parity fixtures**
+  - `tests/parity/fixtures/lora_fwd_merge.json` + `tests/parity_lora.rs` (atol/rtol `1e-5`)
+  - Offline generator `scripts/gen_lora_parity_fixture.py` (Python peft optional)
+  - `METRICS.md` correctness section filled for LoRA forward/merge
+- **PEFT-P0-12 train step**
+  - `train_step_mse` / `train_step_with_loss` + `TrainStepResult`
+  - Scheduled LR, grad-accum counters, candle-nn AdamW `backward_step` on inject path
+  - Not a full PeftTrainer (datasets / checkpoint orchestration remain caller-owned)
+- **PEFT-P1-01 multi-adapter weighted residual composition**
+  - `AdapterWeight`, `AdapterRegistry::set_weighted_adapters`, `forward_weighted`
+  - Composition: `y = base + Σ w_i * residual_i(x)`
+  - Example `examples/multi_adapter.rs` demonstrates weighted mode
+- **PEFT-P1-02 AdaLoRA top-k**
+  - Exact top-`budget` rank mask + cubic `rank_budget_at_step` / schedule hook
+- **PEFT-P1-03 Prefix/Prompt experimental path**
+  - Prefix: optional reparam MLP, `concat_to_kv` for attention K/V
+  - Prompt: `prepend_to_input` + simplified text-seeded init (no tokenizer)
+- **PEFT-P1-04 quant bridge**
+  - `pub mod quant`: `QuantizedBaseLinear`, `QuantizedAdapterLayer`,
+    `forward_quantized_with_adapter`, reference `DenseBaseLinear`
+  - No NF4 codec in-crate — qlora-rs is the intended implementor
+- **PEFT-P2-02 benches (partial)**
+  - Non-empty criterion: LoRA forward, merge, weighted compose (`benches/adapters.rs`)
+
+### Changed
+- Package version **1.1.0** (minor: HF interop + inject + train step + multi-adapter + quant bridge)
+- README status matrix updated for HF keys, inject, parity, train step, weighted compose, quant bridge
+- `LoraLayer::from_weights` for fixture/HF inject construction
+- `METRICS.md` CPU wall-time table from criterion (showcase baselines; not HF parity claims)
+
+### Migration
+- Callers of the old string-only `get_peft_model(&[&str], …)` must switch to
+  `get_peft_model_registry` or the new Linear-based `get_peft_model`.
+
+## [1.0.4] - 2026-07-22
+
+### Changed
+- **Skew heal (SoT):** package version set to **1.0.4**, intentionally superseding crates.io / tag **1.0.3** as the forward Source of Truth (see `DECISION.md`).
+- Local tree was already a descendant of `v1.0.3` but had regressed `Cargo.toml` to 1.0.1 during workspace/fleet merges; version field corrected without resetting history.
+- `cuda` feature remains **candle-core/cuda only** on this tree (no optional `cubecl` / `cubecl-cuda` deps).
+- **PR-021 kernels:** fused CubeCL sources **quarantined** under `src/kernels/archive/`; not exported from `lib.rs`; not compiled. README documents no active fused kernels.
+- **PR-010 docs honesty:** README product class = Candle PEFT adapter **layer library**; honest status matrix; roadmap no longer claims “success criteria already met”; `METRICS.md` scaffold added.
+- **PR-020 flags honesty:**
+  - LoRA `dropout` applied in forward when the layer is unfrozen and `dropout > 0`
+  - `loftq_iterations` documented as **simplified dual-Gaussian init**, not full SVD/quant LoftQ
+  - `Trainable::freeze` documented as a layer flag (gates dropout; does not detach Vars)
+  - `DoraLayer` implements `SaveLoad` (lora weights + magnitude)
+
+### Added
+- `DECISION.md` — formal restore-vs-supersede decision for ECO-P0-03 / PEFT-P0-02.
+- `METRICS.md` — HF peft comparison scaffold (methods listed; numbers not yet measured).
+- `src/kernels/archive/README.md` — quarantine notice for historical kernel sources.
+
+### Fixed
+- Restored missing changelog sections for **1.0.2** and **1.0.3** that were dropped after the 1.0.3 publish line.
+- Corrected historical overclaims about LoftQ “100% Python PEFT parity” and incomplete DoRA SaveLoad notes (see 1.0.0 errata below).
+
+### Notes
+- Do not treat crates.io 1.0.3 as SoT for future commits; publish next from this tree as 1.0.4+.
+
+## [1.0.3] - 2026-01-28
+
+### Changed
+- Updated safetensors dependency from 0.4 to 0.7
+- Updated candle-core and candle-nn dependencies from 0.8 to 0.9
+- Added explicit workspace.dependencies section in Cargo.toml
+- Optional CubeCL deps under `cuda` feature; `pub mod kernels` gated on `cuda` (published surface on crates.io)
+
+### Fixed
+- Clippy lints for `manual_is_multiple_of` in boft.rs, lokr.rs, oft.rs
+- Clippy lint for `manual_midpoint` in training.rs
+
+## [1.0.2] - 2026-01-25
+
+### Changed
+- Migrated LoRA/DoRA GPU kernels to CubeCL 0.9 API
+- Kernel position variables now use correct types
+- Added proper usize casts at array index sites
+- `sync_cube()` replaces deprecated `sync_units()`
+- Wrapped kernel launches in unsafe blocks with SAFETY comments
+
 ## [1.0.1] - 2026-01-24
 
 ### Added
@@ -19,23 +117,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.0.0] - 2026-01-24
 
 ### Added
-- **SaveLoad trait implementations for all 11 adapters** - Complete persistence support
-  - LoraLayer, DoraLayer (lora.rs)
-  - AdaLoraLayer (adalora.rs)
-  - Ia3Layer (ia3.rs)
-  - LoHaLayer (loha.rs)
-  - LoKrLayer (lokr.rs)
-  - OftLayer (oft.rs)
-  - BoftLayer (boft.rs) - already existed
-  - VeraLayer (vera.rs)
-  - PrefixTuningLayer (prefix_tuning.rs)
-  - PromptTuningLayer (prompt_tuning.rs)
+- **SaveLoad trait implementations for adapters** - Persistence support for:
+  - LoraLayer (lora.rs) — **done at 1.0.0**
+  - DoraLayer — **was claimed here but missing until 1.0.4** (implemented in PR-020)
+  - AdaLoraLayer, Ia3Layer, LoHaLayer, LoKrLayer, OftLayer, BoftLayer, VeraLayer
+  - PrefixTuningLayer, PromptTuningLayer
 - **Examples directory** with 3 runnable examples:
   - `basic_lora.rs` - Simple LoRA adapter usage
   - `multi_adapter.rs` - Using AdapterRegistry with multiple adapters
   - `save_load.rs` - Persisting and loading adapter weights
 - `weights()` method for LoRA adapters (from 0.4.1)
-- rsLoRA and LoftQ support for 100% Python PEFT parity
+- rsLoRA scaling (`use_rslora`) and a **simplified** `loftq_iterations` init path
+  - **Errata:** 1.0.0 marketing text claimed “LoftQ support for 100% Python PEFT parity”.
+    That was **false**. Full LoftQ (SVD + quantization residual iterations on base weights)
+    is **not** implemented; `loftq_iterations > 0` only selects dual-Gaussian A/B init.
 - CLAUDE.md for Claude Code development workflow
 
 ### Fixed
@@ -44,7 +139,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Bumped to stable 1.0.0 release
-- All 128 tests passing
+- All 128 tests passing (at release cut)
 - Full clippy compliance with pedantic lints
 
 ## [0.4.1] - 2026-01-16
@@ -113,7 +208,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Configuration system
 - Initial documentation (README, AGENT_GUIDE, GAP_ANALYSIS, TASK_TRACKER)
 
-[Unreleased]: https://github.com/tzervas/peft-rs/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/tzervas/peft-rs/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/tzervas/peft-rs/compare/v1.0.4...v1.1.0
+[1.0.4]: https://github.com/tzervas/peft-rs/compare/v1.0.3...v1.0.4
+[1.0.3]: https://github.com/tzervas/peft-rs/compare/v1.0.2...v1.0.3
+[1.0.2]: https://github.com/tzervas/peft-rs/compare/v1.0.1...v1.0.2
+[1.0.1]: https://github.com/tzervas/peft-rs/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/tzervas/peft-rs/compare/v0.4.1...v1.0.0
 [0.4.1]: https://github.com/tzervas/peft-rs/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/tzervas/peft-rs/compare/v0.3.0...v0.4.0

@@ -6,9 +6,17 @@
 //! - Switching between adapters at runtime
 //! - Performing forward passes with different active adapters
 
+#![allow(
+    clippy::similar_names,
+    clippy::many_single_char_names,
+    clippy::too_many_lines,
+    clippy::items_after_statements
+)]
 use anyhow::Result;
 use candle_core::{Device, Tensor};
-use peft_rs::{Adapter, AdapterRegistry, Ia3Config, Ia3Layer, LoraConfig, LoraLayer};
+use peft_rs::{
+    Adapter, AdapterRegistry, AdapterWeight, Ia3Config, Ia3Layer, LoraConfig, LoraLayer,
+};
 
 fn main() -> Result<()> {
     println!("=== Multi-Adapter Registry Example ===\n");
@@ -143,12 +151,59 @@ fn main() -> Result<()> {
     println!("   Parameters: {}", active_ia3.num_parameters());
 
     // ============================================================================
+    // Weighted residual composition (PEFT-P1-01)
+    // ============================================================================
+
+    println!("\n--- Weighted multi-adapter composition ---");
+    let mut mix: AdapterRegistry<LoraLayer> = AdapterRegistry::new();
+    let cfg_s = LoraConfig {
+        r: 4,
+        alpha: 8,
+        dropout: 0.0,
+        ..Default::default()
+    };
+    let cfg_l = LoraConfig {
+        r: 16,
+        alpha: 32,
+        dropout: 0.0,
+        ..Default::default()
+    };
+    mix.register_adapter(
+        "small",
+        LoraLayer::new_with_zeros(in_features, out_features, cfg_s, &device)?,
+    )?;
+    mix.register_adapter(
+        "large",
+        LoraLayer::new_with_zeros(in_features, out_features, cfg_l, &device)?,
+    )?;
+    mix.set_weighted_adapters([
+        AdapterWeight::new("small", 0.6),
+        AdapterWeight::new("large", 0.4),
+    ])?;
+    let y_mix = mix.forward(&input, None)?;
+    println!(
+        "  Weighted forward (0.6*small + 0.4*large) shape: {:?}",
+        y_mix.shape()
+    );
+    println!("  Composition mode: {}", mix.is_weighted_composition());
+    let one_shot = mix.forward_weighted(
+        &input,
+        None,
+        &[
+            AdapterWeight::new("small", 1.0),
+            AdapterWeight::new("large", 0.0),
+        ],
+    )?;
+    println!("  One-shot forward_weighted shape: {:?}", one_shot.shape());
+
+    // ============================================================================
     // Summary
     // ============================================================================
 
     println!("\n=== Summary ===");
     println!("✓ Successfully created and registered multiple adapters");
     println!("✓ Demonstrated adapter switching with AdapterRegistry");
+    println!("✓ Demonstrated weighted residual composition");
     let lora_len = lora_registry.len();
     println!("✓ LoRA registry has {lora_len} adapters");
     let ia3_len = ia3_registry.len();
