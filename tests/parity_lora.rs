@@ -1,6 +1,6 @@
-//! PR-042: LoRA forward/merge parity against checked-in golden fixtures.
+//! PR-042: `LoRA` forward/merge parity against checked-in golden fixtures.
 //!
-//! Fixtures encode the same math as HuggingFace PEFT Linear LoRA:
+//! Fixtures encode the same math as `HuggingFace` PEFT Linear `LoRA`:
 //! `y = x @ W.T + (x @ A.T @ B.T) * (alpha / r)`
 //! `W_merged = W + (B @ A) * (alpha / r)`
 //!
@@ -11,6 +11,12 @@
 //! - `atol = 1e-5`
 //! - `rtol = 1e-5`
 
+#![allow(
+    clippy::similar_names,
+    clippy::many_single_char_names,
+    clippy::too_many_lines,
+    clippy::items_after_statements
+)]
 use std::path::PathBuf;
 
 use candle_core::{DType, Device, Module, Tensor};
@@ -75,9 +81,14 @@ fn allclose(actual: &Tensor, expected: &Tensor, atol: f32, rtol: f32) -> anyhow:
         expected.dims()
     );
     let diff = (actual - expected)?.abs()?;
-    let tol = (expected.abs()? * f64::from(rtol))?.broadcast_add(&Tensor::new(atol, actual.device())?)?;
+    let tol =
+        (expected.abs()? * f64::from(rtol))?.broadcast_add(&Tensor::new(atol, actual.device())?)?;
     // element-wise: diff <= atol + rtol * |expected|
-    let over = diff.gt(&tol)?.to_dtype(DType::F32)?.sum_all()?.to_scalar::<f32>()?;
+    let over = diff
+        .gt(&tol)?
+        .to_dtype(DType::F32)?
+        .sum_all()?
+        .to_scalar::<f32>()?;
     if over > 0.0 {
         let max_diff = diff.flatten_all()?.max(0)?.to_scalar::<f32>()?;
         anyhow::bail!("allclose failed: {over} elements over tol (max_diff={max_diff}, atol={atol}, rtol={rtol})");

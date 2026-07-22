@@ -76,7 +76,7 @@ pub trait Mergeable: Adapter {
 /// # Freeze honesty
 ///
 /// Implementations set a **layer-level frozen flag**. That flag is used to gate
-/// training-only behavior (e.g. LoRA dropout). It does **not** reliably detach
+/// training-only behavior (e.g. `LoRA` dropout). It does **not** reliably detach
 /// Candle `Var`s from autograd: constructors that materialize plain `Tensor`
 /// weights (`new_with_zeros`) have no grad membership to clear, and
 /// `VarBuilder`/`VarMap` paths still require the optimizer to honor

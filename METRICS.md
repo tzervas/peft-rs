@@ -1,6 +1,6 @@
 # peft-rs Metrics
 
-**Status:** Correctness fixtures landed (PR-042); wall-time / RSS vs HF peft **not yet measured**.  
+**Status:** Correctness fixtures green (PR-042); **CPU LoRA wall-time baselines** from criterion (`--quick`) recorded for 1.1.0.  
 **Purpose:** Showcase-bar tracking for honesty releases.  
 **Product class:** Candle PEFT **adapter layer library** + Linear inject path (not a drop-in HF PEFT framework).
 
@@ -21,8 +21,8 @@ Fair comparisons must use the **same adapter math surface** (e.g. LoRA rank/alph
 
 | Method ID | What | Unit | Status |
 |-----------|------|------|--------|
-| `wall_lora_fwd` | LoRA layer forward (batch×seq×hidden) | ms / step | **not yet measured** |
-| `wall_lora_merge` | Merge ΔW into base weight | ms | **not yet measured** |
+| `wall_lora_fwd` | LoRA layer forward (batch×seq×hidden) | ms / step | **measured** (CPU criterion, below) |
+| `wall_lora_merge` | Merge ΔW into base weight | ms | **measured** (CPU criterion, below) |
 | `wall_dora_fwd` | DoRA forward with base weight | ms / step | **not yet measured** |
 | `rss_lora_layer` | Peak RSS for layer construct + N forwards | MiB | **not yet measured** |
 | `correctness_lora_fwd` | Allclose vs fixed-seed / fixed-matrix golden | max abs err | **green in CI** (see below) |
@@ -73,6 +73,43 @@ Layout: `A` `[r, in]`, `B` `[out, r]`, `W` `[out, in]` (candle `Linear` / PEFT).
 
 ---
 
+## CPU wall-time (PEFT-P2-02 / 1.1.0)
+
+**Environment**
+
+| Field | Value |
+|-------|--------|
+| CPU | Intel Core i7-14700K |
+| Arch | x86_64 |
+| OS | Linux |
+| rustc | 1.98.0-nightly (2026-07-01) |
+| candle | 0.9 |
+| DType / device | F32 / CPU |
+| Command | `cargo bench --bench adapters -- --quick` |
+| Date / SHA | 2026-07-22 / `5f01624` (local tree) |
+| Notes | Criterion `--quick` (short sample); not a full statistical run. **Not** compared to HF peft yet. Non-zero A/B weights. |
+
+### LoRA forward
+
+| Method | Shape | peft-rs (median-ish) | HF peft | Notes |
+|--------|-------|----------------------|---------|-------|
+| `wall_lora_fwd` | b1 s128 h768 r8 | **~0.87 ms** | — | residual only |
+| `wall_lora_fwd` | b4 s128 h768 r8 | **~3.04 ms** | — | residual only |
+| `wall_lora_fwd` | b1 s128 h768 r64 | **~2.69 ms** | — | residual only |
+| `wall_lora_fwd` + base | b4 s128 h768 r8 | **~3.04 ms** | — | `forward(x, Some(base))` |
+
+### LoRA merge
+
+| Method | Shape | peft-rs | HF peft | Notes |
+|--------|-------|---------|---------|-------|
+| `wall_lora_merge` | h768 r8 | **~2.56 ms** | — | `W + B@A * scale` |
+| `wall_lora_merge` | h768 r64 | **~2.51 ms** | — | |
+| `wall_lora_merge` | h2048 r8 | **~14.6 ms** | — | |
+
+Times are criterion central estimates from `--quick` (see band in bench log). Re-run without `--quick` for tighter CIs before publishing vs Python.
+
+---
+
 ## How to reproduce
 
 ```bash
@@ -86,7 +123,9 @@ cargo test --test parity_lora -- --nocapture
 # Inject train demo
 cargo run --example lora_inject_train
 
-# Criterion harness still a stub for wall time
+# Criterion LoRA benches
+cargo bench --bench adapters -- --quick
+# full sample:
 cargo bench --bench adapters
 ```
 
@@ -99,12 +138,13 @@ Record environment in every **wall-time** result row:
 
 ---
 
-## Result table (performance — fill when measured)
+## Result table (performance summary)
 
 | Method | peft-rs | HF peft | Notes | Date / SHA |
 |--------|---------|---------|-------|------------|
-| `wall_lora_fwd` | — | — | not yet measured | — |
-| `wall_lora_merge` | — | — | not yet measured | — |
+| `wall_lora_fwd` b1/s128/h768/r8 | ~0.87 ms | — | CPU F32 criterion --quick | 2026-07-22 / 5f01624 |
+| `wall_lora_fwd` b4/s128/h768/r8 | ~3.04 ms | — | CPU F32 | 2026-07-22 |
+| `wall_lora_merge` h768/r8 | ~2.56 ms | — | CPU F32 | 2026-07-22 |
 | `wall_dora_fwd` | — | — | not yet measured | — |
 | `rss_lora_layer` | — | — | not yet measured | — |
 | `correctness_lora_fwd` | pass @ 1e-5 | math-equivalent fixture | PR-042 | 2026-07-22 |
@@ -114,7 +154,7 @@ Record environment in every **wall-time** result row:
 
 ## Showcase bar (target, not current claim)
 
-Later releases aim for **parity+** on layer math (correctness first) and competitive wall time / RSS on fair fixtures. **1.1.0** closes correctness goldens for LoRA forward/merge; speed numbers remain open (PEFT-P2-03).
+Later releases aim for **parity+** on layer math (correctness first) and competitive wall time / RSS on fair fixtures. **1.1.0** adds CPU LoRA criterion baselines; cross-runtime outperform metrics remain open (PEFT-P2-03).
 
 ---
 
@@ -122,7 +162,12 @@ Later releases aim for **parity+** on layer math (correctness first) and competi
 
 | Gap | Topic | Status after 1.1.0 |
 |-----|--------|--------------------|
-| PEFT-P0-03 | This file | closed (scaffold + correctness) |
+| PEFT-P0-03 | This file | closed (scaffold + correctness + CPU benches) |
 | PEFT-P0-10 | Numerical parity suite | **closed** |
-| PEFT-P2-02 | Real criterion benches | open |
-| PEFT-P2-03 | Showcase outperform metrics | open |
+| PEFT-P0-12 | Minimal train step | **closed** |
+| PEFT-P1-01 | Weighted multi-adapter | **closed** |
+| PEFT-P1-02 | AdaLoRA top-k budget | **closed** |
+| PEFT-P1-03 | Prefix/prompt experimental path | **closed** |
+| PEFT-P1-04 | Quantization bridge trait | **closed** |
+| PEFT-P2-02 | Real criterion benches | **closed** |
+| PEFT-P2-03 | Showcase outperform metrics vs HF | open |

@@ -261,11 +261,7 @@ impl LoraLayer {
     ///
     /// # Errors
     /// Returns an error if config is invalid or shapes do not match.
-    pub fn from_weights(
-        lora_a: Tensor,
-        lora_b: Tensor,
-        config: LoraConfig,
-    ) -> Result<Self> {
+    pub fn from_weights(lora_a: Tensor, lora_b: Tensor, config: LoraConfig) -> Result<Self> {
         config.validate()?;
         let scaling = if config.use_rslora {
             config.alpha as f64 / (config.r as f64).sqrt()
@@ -999,7 +995,14 @@ mod tests {
         layer.freeze();
         let f1 = layer.forward(&input, None).unwrap();
         let f2 = layer.forward(&input, None).unwrap();
-        let d1 = (f1 - f2).unwrap().abs().unwrap().sum_all().unwrap().to_scalar::<f32>().unwrap();
+        let d1 = (f1 - f2)
+            .unwrap()
+            .abs()
+            .unwrap()
+            .sum_all()
+            .unwrap()
+            .to_scalar::<f32>()
+            .unwrap();
         assert!(d1 < 1e-5, "frozen forward must be deterministic");
 
         // Unfrozen outputs exist and match shape

@@ -1,5 +1,11 @@
-//! PR-040: HuggingFace adapter_config + LoRA key round-trip fixtures.
+//! PR-040: `HuggingFace` `adapter_config` + `LoRA` key round-trip fixtures.
 
+#![allow(
+    clippy::similar_names,
+    clippy::many_single_char_names,
+    clippy::too_many_lines,
+    clippy::items_after_statements
+)]
 use std::collections::HashMap;
 
 use candle_core::{DType, Device, Tensor};
@@ -78,13 +84,20 @@ fn hf_weight_keys_module_prefix_roundtrip() -> anyhow::Result<()> {
 
     let mut loaded = LoraLayer::new_with_zeros(32, 32, lora_cfg, &device)?;
     let loaded_cfg = load_pretrained_hf(&mut loaded, dir.path(), &device, Some(prefix))?;
-    assert_eq!(loaded_cfg.base_model_name_or_path.as_deref(), Some("fixture/base"));
+    assert_eq!(
+        loaded_cfg.base_model_name_or_path.as_deref(),
+        Some("fixture/base")
+    );
     assert_eq!(loaded_cfg.task_type.as_deref(), Some("FEATURE_EXTRACTION"));
 
     let x = Tensor::randn(0f32, 1f32, (2, 5, 32), &device)?;
     let y0 = layer.forward(&x, None)?;
     let y1 = loaded.forward(&x, None)?;
-    let max = (y0 - y1)?.abs()?.flatten_all()?.max(0)?.to_scalar::<f32>()?;
+    let max = (y0 - y1)?
+        .abs()?
+        .flatten_all()?
+        .max(0)?
+        .to_scalar::<f32>()?;
     assert!(max < 1e-5, "max diff {max}");
     Ok(())
 }

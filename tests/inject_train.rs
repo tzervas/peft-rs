@@ -1,5 +1,11 @@
-//! PR-041: Linear+LoRA inject path with candle-nn AdamW adapter updates.
+//! PR-041: Linear+LoRA inject path with candle-nn `AdamW` adapter updates.
 
+#![allow(
+    clippy::similar_names,
+    clippy::many_single_char_names,
+    clippy::too_many_lines,
+    clippy::items_after_statements
+)]
 use candle_core::{DType, Device, Module, Tensor};
 use candle_nn::{linear_no_bias, AdamW, Linear, Optimizer, ParamsAdamW, VarBuilder, VarMap};
 use peft_rs::{get_peft_model, LinearWithLora, LoraConfig, PeftLinearModel};
@@ -46,11 +52,7 @@ fn linear_with_lora_forward_adds_residual() -> anyhow::Result<()> {
     assert_eq!(y.dims(), &[1, 1, 4]);
     // Residual path must move output away from pure identity
     let base_only = layer.base().forward(&x)?;
-    let diff = y
-        .sub(&base_only)?
-        .abs()?
-        .sum_all()?
-        .to_scalar::<f32>()?;
+    let diff = y.sub(&base_only)?.abs()?.sum_all()?.to_scalar::<f32>()?;
     assert!(diff > 1e-3, "expected non-zero LoRA residual, got {diff}");
     Ok(())
 }

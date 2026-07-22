@@ -21,10 +21,10 @@ matrix and [METRICS.md](../METRICS.md) over older “all complete” tables.
 | **Trainable freeze** | partial | Flag + dropout gate; no Var detach |
 | **Weight I/O** | partial | safetensors; schema ≠ HF peft |
 | **PeftModel / get_peft_model** | stub | Name-list registry only |
-| **Multi-adapter registry** | partial | Single active switch |
-| **Training utilities** | stub | LR schedules / counters only |
+| **Multi-adapter registry** | done (core) | Switch + weighted residual compose |
+| **Training utilities** | partial | Schedules + `train_step_mse` (not full PeftTrainer) |
 | **Fused CUDA kernels** | quarantined | `src/kernels/archive/` — not built |
-| **QLoRA / quant** | missing | Non-goal in this crate |
+| **QLoRA / quant** | bridge only | `quant` traits; codecs in qlora-rs |
 | **HF full interop** | missing | PR-040+ |
 | **METRICS vs Python peft** | scaffold | Numbers not yet measured |
 
@@ -36,8 +36,12 @@ matrix and [METRICS.md](../METRICS.md) over older “all complete” tables.
 | PEFT-P0-09 | Real model inject | 3b |
 | PEFT-P0-10 | Numerical parity | 3b |
 | PEFT-P0-11 | modules_to_save | 3b |
-| PEFT-P0-12 | Real training step or non-goal | 3b |
-| PEFT-P1-* | Compose, AdaLoRA top-k, prefix reparam, kernels restore | 3b |
+| PEFT-P0-12 | Real training step | **done** (`train_step_mse`) |
+| PEFT-P1-01 | Weighted multi-adapter | **done** |
+| PEFT-P1-02 | AdaLoRA top-k budget | **done** |
+| PEFT-P1-03 | Prefix reparam + prompt text init | **done** (experimental) |
+| PEFT-P1-04 | Quant bridge | **done** |
+| PEFT-P1-05/06 | Kernels restore / Conv2d-Embedding LoRA | open |
 | PEFT-P2-* | Extra tuners, benches, showcase metrics | 3c |
 
 ## Historical notes

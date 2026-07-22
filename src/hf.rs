@@ -1,4 +1,4 @@
-//! HuggingFace PEFT interop for LoRA adapter config and weight keys.
+//! `HuggingFace` PEFT interop for `LoRA` adapter config and weight keys.
 //!
 //! # Config schema (`adapter_config.json`)
 //!
@@ -22,8 +22,9 @@
 //! # Non-goals
 //!
 //! - Full multi-adapter PEFT archive layouts beyond the `default` adapter name
-//! - Auto-discovery of every PEFT tuner type (LoRA only for HF schema here)
+//! - Auto-discovery of every PEFT tuner type (`LoRA` only for HF schema here)
 
+#![allow(clippy::struct_excessive_bools, clippy::implicit_hasher)]
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
@@ -41,10 +42,10 @@ use crate::io::{
 /// Default HF PEFT adapter name embedded in weight keys.
 pub const DEFAULT_ADAPTER_NAME: &str = "default";
 
-/// PEFT type string written to `adapter_config.json` for LoRA.
+/// PEFT type string written to `adapter_config.json` for `LoRA`.
 pub const PEFT_TYPE_LORA: &str = "LORA";
 
-/// HuggingFace-compatible LoRA `adapter_config.json` schema (core fields).
+/// HuggingFace-compatible `LoRA` `adapter_config.json` schema (core fields).
 ///
 /// Serializes with the field names Python PEFT expects. Extra unknown fields
 /// are ignored on load (`deny_unknown_fields` is **not** set) so minor PEFT
@@ -55,10 +56,10 @@ pub struct HfLoraConfig {
     #[serde(default = "default_peft_type")]
     pub peft_type: String,
 
-    /// LoRA rank.
+    /// `LoRA` rank.
     pub r: usize,
 
-    /// LoRA alpha (maps to [`LoraConfig::alpha`]).
+    /// `LoRA` alpha (maps to [`LoraConfig::alpha`]).
     pub lora_alpha: usize,
 
     /// Target module name fragments (e.g. `q_proj`, `v_proj`).
@@ -73,12 +74,12 @@ pub struct HfLoraConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub task_type: Option<String>,
 
-    /// Dropout on the LoRA path (maps to [`LoraConfig::dropout`]).
+    /// Dropout on the `LoRA` path (maps to [`LoraConfig::dropout`]).
     #[serde(default)]
     pub lora_dropout: f64,
 
     /// Bias handling (`"none"`, `"all"`, `"lora_only"`). peft-rs treats as
-    /// documentation only for now (Linear LoRA is bias-free).
+    /// documentation only for now (Linear `LoRA` is bias-free).
     #[serde(default = "default_bias")]
     pub bias: String,
 
@@ -90,11 +91,11 @@ pub struct HfLoraConfig {
     #[serde(default)]
     pub inference_mode: bool,
 
-    /// Rank-stabilized LoRA scaling.
+    /// Rank-stabilized `LoRA` scaling.
     #[serde(default)]
     pub use_rslora: bool,
 
-    /// DoRA flag (config only here; use [`crate::DoraLayer`] for math).
+    /// `DoRA` flag (config only here; use [`crate::DoraLayer`] for math).
     #[serde(default)]
     pub use_dora: bool,
 
@@ -183,7 +184,7 @@ impl HfLoraConfig {
     ///
     /// # Errors
     /// Returns [`PeftError::InvalidConfig`] when rank/alpha are zero or
-    /// `peft_type` is not LoRA.
+    /// `peft_type` is not `LoRA`.
     pub fn validate(&self) -> Result<()> {
         if self.peft_type.to_uppercase() != PEFT_TYPE_LORA {
             return Err(PeftError::InvalidConfig(format!(
@@ -206,7 +207,7 @@ impl HfLoraConfig {
     }
 }
 
-/// Weight key naming style for LoRA tensors.
+/// Weight key naming style for `LoRA` tensors.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LoraKeyStyle {
     /// peft-rs native: `lora_a.weight` / `lora_b.weight`
@@ -243,7 +244,7 @@ impl LoraKeyStyle {
         }
     }
 
-    /// Key for the LoRA A weight under this style.
+    /// Key for the `LoRA` A weight under this style.
     #[must_use]
     pub fn key_a(&self) -> String {
         match self {
@@ -256,7 +257,7 @@ impl LoraKeyStyle {
         }
     }
 
-    /// Key for the LoRA B weight under this style.
+    /// Key for the `LoRA` B weight under this style.
     #[must_use]
     pub fn key_b(&self) -> String {
         match self {
@@ -283,7 +284,7 @@ pub fn pack_lora_state_dict(
     map
 }
 
-/// Extract LoRA A/B tensors from a state dict that may use native or HF keys.
+/// Extract `LoRA` A/B tensors from a state dict that may use native or HF keys.
 ///
 /// Accepted patterns (first match wins per matrix):
 /// - Native: `lora_a.weight` / `lora_b.weight`
@@ -564,10 +565,7 @@ mod tests {
     #[test]
     fn test_key_styles() {
         assert_eq!(LoraKeyStyle::Native.key_a(), "lora_a.weight");
-        assert_eq!(
-            LoraKeyStyle::hf_default().key_a(),
-            "lora_A.default.weight"
-        );
+        assert_eq!(LoraKeyStyle::hf_default().key_a(), "lora_A.default.weight");
         assert_eq!(
             LoraKeyStyle::hf_module("layers.0.q_proj").key_b(),
             "layers.0.q_proj.lora_B.default.weight"
@@ -632,16 +630,10 @@ mod tests {
         assert!(raw.contains("peft_type"));
 
         // Weight file uses HF keys
-        let tensors = candle_core::safetensors::load(
-            temp.path().join(ADAPTER_WEIGHTS_FILENAME),
-            &device,
-        )?;
-        assert!(tensors.contains_key(
-            "encoder.layer.0.attention.q_proj.lora_A.default.weight"
-        ));
-        assert!(tensors.contains_key(
-            "encoder.layer.0.attention.q_proj.lora_B.default.weight"
-        ));
+        let tensors =
+            candle_core::safetensors::load(temp.path().join(ADAPTER_WEIGHTS_FILENAME), &device)?;
+        assert!(tensors.contains_key("encoder.layer.0.attention.q_proj.lora_A.default.weight"));
+        assert!(tensors.contains_key("encoder.layer.0.attention.q_proj.lora_B.default.weight"));
         assert!(!tensors.contains_key("lora_a.weight"));
 
         let mut loaded = LoraLayer::new_with_zeros(16, 16, lora_cfg, &device)?;

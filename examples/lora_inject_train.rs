@@ -1,10 +1,16 @@
-//! Tiny multi-layer MLP with LoRA inject + candle-nn AdamW (PR-041).
+//! Tiny multi-layer MLP with `LoRA` inject + candle-nn `AdamW` (PR-041).
 //!
 //! Demonstrates:
 //! - `get_peft_model` wrapping named `Linear` modules
 //! - Real stacked forward
-//! - Adapter params change under AdamW while base weights stay frozen
+//! - Adapter params change under `AdamW` while base weights stay frozen
 
+#![allow(
+    clippy::similar_names,
+    clippy::many_single_char_names,
+    clippy::too_many_lines,
+    clippy::items_after_statements
+)]
 use anyhow::Result;
 use candle_core::{DType, Device, Tensor};
 use candle_nn::{linear_no_bias, AdamW, Linear, Optimizer, ParamsAdamW, VarBuilder, VarMap};

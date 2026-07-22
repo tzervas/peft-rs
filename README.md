@@ -23,7 +23,7 @@ Candle PEFT **adapter layer library** for Rust.
 - Common traits: `Adapter`, `Mergeable`, `Trainable`, `SaveLoad`
 - **HF LoRA interop** (`hf` module): `adapter_config.json` core fields + `lora_A`/`lora_B` key mapping
 - **`LinearWithLora` / `PeftLinearModel`**: real base Linear + LoRA residual forward for named modules
-- Multi-adapter **registry** (single active adapter; no weighted compose yet)
+- Multi-adapter **registry** with single-active switch **and** weighted residual composition
 - **LoRA parity fixtures** under `tests/parity/` (forward/merge allclose)
 
 ## Non-goals
@@ -32,8 +32,8 @@ Candle PEFT **adapter layer library** for Rust.
 |----------|--------|
 | Full transformers model zoo / AutoModel | Caller supplies named `Linear`s |
 | Automatic `modules_to_save` training | Field preserved on `HfLoraConfig` only (see below) |
-| QLoRA / bitsandbytes / GPTQ / AWQ | Out of this crate; see qlora-rs ecosystem |
-| PeftTrainer / full training loop | Use candle-nn AdamW on adapter `VarMap` (see example) |
+| Full QLoRA codecs (NF4/FP4) / bnb / GPTQ / AWQ | Out of this crate; `quant` bridge traits only — see qlora-rs |
+| Full PeftTrainer / dataset loop | Thin `train_step_mse` helper; full loops are caller's (see example) |
 | Fused CUDA kernels (CubeCL) | **Quarantined** under `src/kernels/archive/` (PR-021) |
 | Full multi-tuner HF parity | LoRA is the product interop surface |
 
@@ -54,15 +54,19 @@ Legend: **done** = usable · **partial** = real code but incomplete vs HF · **m
 | `modules_to_save` | **non-goal / config-only** | Serialized on HF config; not auto-trained |
 | DoRA | **partial** | Magnitude/direction; SaveLoad supported |
 | LoftQ init | **stub / simplified** | Dual-Gaussian; not full SVD+quant LoftQ |
-| AdaLoRA / IA³ / LoHa / LoKr / OFT / BOFT / VeRA | **partial** | Layer math; no HF key suite |
-| Prefix / Prompt tuning | **partial / thin** | Helpers only |
-| Multi-adapter registry | **partial** | Switch active; no weighted compose |
+| AdaLoRA | **partial** | SVD param + **top-k** rank mask + cubic budget schedule; no HF key suite |
+| IA³ / LoHa / LoKr / OFT / BOFT / VeRA | **partial** | Layer math; no HF key suite |
+| Prefix / Prompt tuning | **experimental** | Reparam MLP + `concat_to_kv`; prompt prepend + simplified text init |
+| Multi-adapter registry | **done** (core) | Switch active + weighted residual compose (`AdapterWeight`) |
+| Train step helper | **done** (minimal) | `train_step_mse` / `train_step_with_loss` on inject path |
+| Quant bridge traits | **done** (bridge) | `QuantizedBaseLinear` / compose helper; codecs in qlora-rs |
 | Trainable freeze | **partial** | Layer flag; gates dropout; does **not** detach Vars |
+| Criterion benches | **done** (LoRA) | Real LoRA forward/merge benches; numbers in METRICS.md (CPU) |
 | CUDA (candle) | **partial** | Feature enables candle CUDA device path only |
 | Fused GPU kernels | **missing (quarantined)** | Archive only |
-| QLoRA / full HF trainer | **missing** | Explicit non-goals |
+| Full QLoRA / HF trainer | **missing** | Codecs + full trainer remain non-goals |
 
-Showcase: LoRA **correctness** goldens are green; wall-time vs HF peft **not yet measured** (METRICS.md).
+Showcase: LoRA **correctness** goldens are green; CPU wall-time baselines in METRICS.md (not yet vs HF peft).
 
 ## Features (Cargo)
 
@@ -76,10 +80,10 @@ There is **no** `cubecl` feature on this tree. Historical fused-kernel sources l
 
 ```toml
 [dependencies]
-peft-rs = "1.1"
+peft-rs = "1.1.0"
 
 # Optional: candle CUDA device support (not peft fused kernels)
-peft-rs = { version = "1.1", features = ["cuda"] }
+peft-rs = { version = "1.1.0", features = ["cuda"] }
 ```
 
 ## Installation
@@ -229,6 +233,14 @@ let output1 = registry.forward(&input, None)?;
 
 registry.set_active_adapter("task2")?;
 let output2 = registry.forward(&input, None)?;
+
+// Weighted residual composition
+use peft_rs::AdapterWeight;
+registry.set_weighted_adapters([
+    AdapterWeight::new("task1", 0.7),
+    AdapterWeight::new("task2", 0.3),
+])?;
+let mixed = registry.forward(&input, None)?;
 ```
 
 ## Architecture

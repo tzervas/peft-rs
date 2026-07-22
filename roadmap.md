@@ -12,7 +12,7 @@ trainer loop in this crate).
 | Horizon | Criteria | Status |
 |---------|----------|--------|
 | **1.0.4 honesty train** | Docs match code; flags honesty; METRICS scaffold | **Met** |
-| **1.1.0 HF + inject + parity** | HF config/keys, Linear inject, LoRA goldens | **Met** (this release) |
+| **1.1.0 HF + inject + parity + train/multi/quant** | HF config/keys, Linear inject, LoRA goldens, train step, weighted multi-adapter, quant bridge | **Met** (this release) |
 | **Mid** | freeze/grad truth on Var path; wall-time METRICS | **Not met** |
 | **Later** | Optional fused CUDA kernels; broader tuner surface | **Not met** / kernels quarantined |
 
@@ -43,14 +43,15 @@ trainer loop in this crate).
 - [x] Real Linear inject / get_peft_model path (PEFT-P0-09) — PR-041
 - [x] Golden numerical parity for LoRA forward/merge (PEFT-P0-10) — PR-042
 - [x] modules_to_save policy documented config-only (PEFT-P0-11) — PR-041
-- [ ] Training: real Var updates or explicit non-goal rename (PEFT-P0-12) — partial: AdamW example exists; module still schedules-only
-- [ ] Multi-adapter weighted composition (PEFT-P1-01)
-- [ ] AdaLoRA top-k budget (PEFT-P1-02)
-- [ ] Prefix reparam + prompt text init (PEFT-P1-03)
+- [x] Training: real Var updates via `train_step_mse` (PEFT-P0-12) — PR-072; full PeftTrainer remains non-goal
+- [x] Multi-adapter weighted composition (PEFT-P1-01) — PR-080
+- [x] AdaLoRA top-k budget (PEFT-P1-02)
+- [x] Prefix reparam + prompt text init (PEFT-P1-03)
+- [x] Quant bridge trait for qlora-rs (PEFT-P1-04) — PR-081
 - [ ] Optional CubeCL kernel restore under feature (PEFT-P1-05) — currently quarantined
 - [ ] Conv2d / Embedding LoRA (PEFT-P1-06)
 - [ ] Additional tuners (p-tuning, X-LoRA, etc.) only after P0/P1 (PEFT-P2-01)
-- [ ] Non-empty criterion benches + property tests (PEFT-P2-02)
+- [x] Non-empty criterion benches (PEFT-P2-02 partial) — forward/merge/compose; property tests still open
 - [ ] Fill METRICS.md with real numbers (PEFT-P2-03)
 
 ## Non-goals (until later PRs)

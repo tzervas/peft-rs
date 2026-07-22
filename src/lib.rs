@@ -14,20 +14,24 @@
 //! - **OFT** (Orthogonal Fine-Tuning)
 //! - **BOFT** (Butterfly Orthogonal Fine-Tuning)
 //! - **`VeRA`** (Vector-based Random Matrix Adaptation)
-//! - **Prefix Tuning** / **Prompt Tuning** (thin embeddings helpers)
+//! - **Prefix Tuning** / **Prompt Tuning** (**experimental** helpers + reparam / prepend)
 //!
 //! ## Product path (1.1+)
 //!
 //! - [`LinearWithLora`] / [`PeftLinearModel`] / [`get_peft_model`] — real base
-//!   Linear + LoRA residual forward for caller-supplied modules
-//! - [`hf`] — HuggingFace `adapter_config.json` + `lora_A` / `lora_B` key interop
-//! - Parity fixtures under `tests/parity/` (LoRA forward/merge goldens)
+//!   Linear + `LoRA` residual forward for caller-supplied modules
+//! - [`hf`] — `HuggingFace` `adapter_config.json` + `lora_A` / `lora_B` key interop
+//! - [`training::train_step_mse`] — minimal real `AdamW` train step on inject path
+//! - [`AdapterRegistry`] weighted residual composition
+//! - [`quant`] — `QLoRA` bridge traits (impl lives in qlora-rs)
+//! - Parity fixtures under `tests/parity/` (`LoRA` forward/merge goldens)
 //!
 //! ## Non-goals (crate docs)
 //!
-//! Full transformers model zoo, QLoRA, PeftTrainer loops, and fused CUDA kernels
-//! are **not** provided as complete features. Historical CubeCL sources are
-//! quarantined under `src/kernels/archive/` and are **not** exported.
+//! Full transformers model zoo, full `QLoRA` codecs, full `PeftTrainer` loops, and
+//! fused CUDA kernels are **not** provided as complete features. Historical
+//! `CubeCL` sources are quarantined under `src/kernels/archive/` and are **not**
+//! exported.
 //!
 //! ## Quick Start
 //!
@@ -60,6 +64,7 @@ pub mod error;
 pub mod hf;
 pub mod io;
 pub mod model;
+pub mod quant;
 pub mod registry;
 pub mod training;
 pub mod traits;
@@ -76,7 +81,7 @@ pub use adapters::lokr::{LoKrConfig, LoKrLayer};
 pub use adapters::lora::{DoraLayer, LoraConfig, LoraLayer};
 pub use adapters::oft::{OftConfig, OftLayer};
 pub use adapters::prefix_tuning::{PrefixTuningConfig, PrefixTuningLayer};
-pub use adapters::prompt_tuning::{PromptTuningConfig, PromptTuningLayer};
+pub use adapters::prompt_tuning::{PromptInit, PromptTuningConfig, PromptTuningLayer};
 pub use adapters::vera::{VeraConfig, VeraLayer};
 pub use error::{PeftError, Result};
 pub use hf::{
@@ -93,9 +98,12 @@ pub use model::{
     get_peft_model, get_peft_model_registry, LinearWithLora, ModulePattern, PeftLinearModel,
     PeftModel,
 };
-pub use registry::AdapterRegistry;
+pub use quant::{
+    forward_quantized_with_adapter, DenseBaseLinear, QuantizedAdapterLayer, QuantizedBaseLinear,
+};
+pub use registry::{AdapterRegistry, AdapterWeight};
 pub use training::{
-    count_trainable_parameters, format_parameter_count, AdapterTrainingConfig,
-    AdapterTrainingState, LrSchedule,
+    count_trainable_parameters, format_parameter_count, train_step_mse, train_step_with_loss,
+    AdapterTrainingConfig, AdapterTrainingState, LrSchedule, TrainStepResult,
 };
 pub use traits::{Adapter, AdapterConfig, Mergeable, Trainable};

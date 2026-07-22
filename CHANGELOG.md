@@ -28,11 +28,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `tests/parity/fixtures/lora_fwd_merge.json` + `tests/parity_lora.rs` (atol/rtol `1e-5`)
   - Offline generator `scripts/gen_lora_parity_fixture.py` (Python peft optional)
   - `METRICS.md` correctness section filled for LoRA forward/merge
+- **PEFT-P0-12 train step**
+  - `train_step_mse` / `train_step_with_loss` + `TrainStepResult`
+  - Scheduled LR, grad-accum counters, candle-nn AdamW `backward_step` on inject path
+  - Not a full PeftTrainer (datasets / checkpoint orchestration remain caller-owned)
+- **PEFT-P1-01 multi-adapter weighted residual composition**
+  - `AdapterWeight`, `AdapterRegistry::set_weighted_adapters`, `forward_weighted`
+  - Composition: `y = base + Σ w_i * residual_i(x)`
+  - Example `examples/multi_adapter.rs` demonstrates weighted mode
+- **PEFT-P1-02 AdaLoRA top-k**
+  - Exact top-`budget` rank mask + cubic `rank_budget_at_step` / schedule hook
+- **PEFT-P1-03 Prefix/Prompt experimental path**
+  - Prefix: optional reparam MLP, `concat_to_kv` for attention K/V
+  - Prompt: `prepend_to_input` + simplified text-seeded init (no tokenizer)
+- **PEFT-P1-04 quant bridge**
+  - `pub mod quant`: `QuantizedBaseLinear`, `QuantizedAdapterLayer`,
+    `forward_quantized_with_adapter`, reference `DenseBaseLinear`
+  - No NF4 codec in-crate — qlora-rs is the intended implementor
+- **PEFT-P2-02 benches (partial)**
+  - Non-empty criterion: LoRA forward, merge, weighted compose (`benches/adapters.rs`)
 
 ### Changed
-- Package version **1.1.0** (minor: product inject + HF interop surface; registry API rename)
-- README status matrix updated for HF keys, inject, parity
+- Package version **1.1.0** (minor: HF interop + inject + train step + multi-adapter + quant bridge)
+- README status matrix updated for HF keys, inject, parity, train step, weighted compose, quant bridge
 - `LoraLayer::from_weights` for fixture/HF inject construction
+- `METRICS.md` CPU wall-time table from criterion (showcase baselines; not HF parity claims)
 
 ### Migration
 - Callers of the old string-only `get_peft_model(&[&str], …)` must switch to
@@ -188,7 +208,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Configuration system
 - Initial documentation (README, AGENT_GUIDE, GAP_ANALYSIS, TASK_TRACKER)
 
-[Unreleased]: https://github.com/tzervas/peft-rs/compare/v1.0.4...HEAD
+[Unreleased]: https://github.com/tzervas/peft-rs/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/tzervas/peft-rs/compare/v1.0.4...v1.1.0
 [1.0.4]: https://github.com/tzervas/peft-rs/compare/v1.0.3...v1.0.4
 [1.0.3]: https://github.com/tzervas/peft-rs/compare/v1.0.2...v1.0.3
 [1.0.2]: https://github.com/tzervas/peft-rs/compare/v1.0.1...v1.0.2
