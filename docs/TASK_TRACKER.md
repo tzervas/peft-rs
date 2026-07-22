@@ -34,7 +34,7 @@ This document tracks the implementation progress of features in peft-rs based on
 | Feature | Status | Priority |
 |---------|--------|----------|
 | **Quantization Support** | ❌ Not Started | Low |
-| **Inference Utilities** | 🟡 Partial | Medium |
+| **Inference Utilities** | ✅ Complete | Medium |
 
 ---
 
@@ -208,14 +208,14 @@ Implemented in `src/training.rs` with:
 ---
 
 ### 3.3 Evaluation/Inference Utilities
-**Status:** ❌ Not Started  
+**Status:** ✅ Complete
 **Priority:** Low  
 **Estimated Effort:** 2-3 days
 
 **Tasks:**
-- [ ] Batch adapter switching
-- [ ] Merged inference mode
-- [ ] Export utilities
+- [x] Batch adapter switching
+- [x] Merged inference mode
+- [x] Export utilities
 
 ---
 
