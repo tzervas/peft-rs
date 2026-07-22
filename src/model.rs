@@ -328,6 +328,91 @@ where
     Ok(model)
 }
 
+impl<A: crate::traits::Mergeable> PeftModel<A> {
+    /// Merge active adapter weights into a base weight map.
+    ///
+    /// This function finds matching keys in the base weights map and merges
+    /// the active adapter's weights into them.
+    ///
+    /// # Errors
+    /// Returns an error if merging fails or a module weight is not found.
+    pub fn merge_weights(
+        &self,
+        base_weights: &HashMap<String, Tensor>,
+    ) -> Result<HashMap<String, Tensor>> {
+        let mut merged_weights = base_weights.clone();
+
+        for (module_name, adapters) in &self.module_adapters {
+            // Find active adapter
+            if let Some(entry) = adapters.values().find(|e| e.active) {
+                // Try to find the weight in the map.
+                // It could be exactly `module_name` or `module_name.weight`
+                let weight_key = if base_weights.contains_key(module_name) {
+                    Some(module_name.clone())
+                } else {
+                    let key_with_suffix = format!("{module_name}.weight");
+                    if base_weights.contains_key(&key_with_suffix) {
+                        Some(key_with_suffix)
+                    } else {
+                        None
+                    }
+                };
+
+                if let Some(key) = weight_key {
+                    let base_weight = &base_weights[&key];
+                    let merged = entry.adapter.merge(base_weight)?;
+                    merged_weights.insert(key, merged);
+                } else {
+                    return Err(PeftError::InvalidConfig(format!(
+                        "Base weight not found for module '{module_name}'"
+                    )));
+                }
+            }
+        }
+
+        Ok(merged_weights)
+    }
+
+    /// Unmerge active adapter weights from a merged weight map.
+    ///
+    /// # Errors
+    /// Returns an error if unmerging fails or a module weight is not found.
+    pub fn unmerge_weights(
+        &self,
+        merged_weights: &HashMap<String, Tensor>,
+    ) -> Result<HashMap<String, Tensor>> {
+        let mut unmerged_weights = merged_weights.clone();
+
+        for (module_name, adapters) in &self.module_adapters {
+            // Find active adapter
+            if let Some(entry) = adapters.values().find(|e| e.active) {
+                let weight_key = if merged_weights.contains_key(module_name) {
+                    Some(module_name.clone())
+                } else {
+                    let key_with_suffix = format!("{module_name}.weight");
+                    if merged_weights.contains_key(&key_with_suffix) {
+                        Some(key_with_suffix)
+                    } else {
+                        None
+                    }
+                };
+
+                if let Some(key) = weight_key {
+                    let merged_weight = &merged_weights[&key];
+                    let unmerged = entry.adapter.unmerge(merged_weight)?;
+                    unmerged_weights.insert(key, unmerged);
+                } else {
+                    return Err(PeftError::InvalidConfig(format!(
+                        "Merged weight not found for module '{module_name}'"
+                    )));
+                }
+            }
+        }
+
+        Ok(unmerged_weights)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

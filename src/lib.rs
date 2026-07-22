@@ -45,6 +45,7 @@
 pub mod adapters;
 pub mod config;
 pub mod error;
+pub mod inference;
 pub mod io;
 pub mod model;
 pub mod registry;
@@ -62,6 +63,9 @@ pub use adapters::prefix_tuning::{PrefixTuningConfig, PrefixTuningLayer};
 pub use adapters::prompt_tuning::{PromptTuningConfig, PromptTuningLayer};
 pub use adapters::vera::{VeraConfig, VeraLayer};
 pub use error::{PeftError, Result};
+pub use inference::{
+    validate_adapter_compatibility, BatchAdapterSwitcher, InferenceMetrics, InferenceMode,
+};
 pub use io::{
     load_adapter_config, load_adapter_weights, load_pretrained, save_adapter_config,
     save_adapter_weights, save_pretrained, SaveLoad, ADAPTER_CONFIG_FILENAME,
