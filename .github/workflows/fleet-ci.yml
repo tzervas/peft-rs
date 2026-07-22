@@ -1,5 +1,7 @@
 # Fleet standard CI — self-hosted. Honest status on trunk via Actions badge.
-# See docs/FLEET_STANDARDS.md (or plans/fractal/P26_FLEET_STANDARDS.md).
+# Product Test Suite runs on GitHub-hosted (ci.yml) because self-hosted hosts
+# SIGKILL candle-core compiles under memory pressure. fleet-ci still exercises
+# the self-hosted path with extreme rustc memory limits.
 name: fleet-ci
 
 on:
@@ -9,19 +11,19 @@ on:
     branches: [main, master, dev]
   workflow_dispatch:
 
-# Share concurrency group with product CI so self-hosted candle builds do not
-# OOM each other (SIGKILL on pulp/candle-core).
 concurrency:
-  group: peft-rs-rust-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: false
+  group: fleet-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
 
 env:
+  # Minimize peak RSS on constrained self-hosted runners.
   CARGO_BUILD_JOBS: "1"
   CARGO_INCREMENTAL: "0"
   CARGO_PROFILE_DEV_DEBUG: "0"
+  RUSTFLAGS: "-C codegen-units=1 -C debuginfo=0"
 
 jobs:
   detect:
@@ -49,10 +51,11 @@ jobs:
     runs-on: [self-hosted, linux, x64, podman]
     steps:
       - uses: actions/checkout@v4
+      - name: free memory snapshot
+        run: free -h || true
       - name: cargo check
         run: cargo check --workspace --all-targets
       - name: cargo test
-        # Reuse artifacts from check when possible; single job avoids dual compile.
         run: cargo test --workspace
 
   python:
