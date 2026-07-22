@@ -53,6 +53,7 @@ jobs:
     name: Test Suite
     runs-on: ${{ matrix.os == 'macos-latest' && 'macos-latest' || fromJSON('["self-hosted", "linux", "x64", "podman"]') }}
     strategy:
+      max-parallel: 1
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
         rust: [stable, nightly]
