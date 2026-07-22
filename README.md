@@ -12,56 +12,57 @@ Candle PEFT **adapter layer library** for Rust.
 [![License](https://img.shields.io/crates/l/peft-rs.svg)](LICENSE)
 
 > **Honest product class:** modular PEFT *layer math* on
-> [candle](https://github.com/huggingface/candle) (forward / merge / safetensors).
+> [candle](https://github.com/huggingface/candle) (forward / merge / safetensors)
+> plus a **Linear inject path** (`LinearWithLora` / `get_peft_model`).
 > This is **not** a drop-in HuggingFace PEFT framework and does **not** claim full
-> Python parity. See [METRICS.md](METRICS.md) and [roadmap.md](roadmap.md).
+> Python parity for every tuner. See [METRICS.md](METRICS.md) and [roadmap.md](roadmap.md).
 
 ## What this crate is
 
 - Standalone adapter **layers** (LoRA, DoRA, AdaLoRA, IA³, LoHa, LoKr, OFT, BOFT, VeRA, prefix/prompt tuning)
 - Common traits: `Adapter`, `Mergeable`, `Trainable`, `SaveLoad`
-- Safetensors + JSON helpers for adapter weights/config (Rust-native keys/schema today)
+- **HF LoRA interop** (`hf` module): `adapter_config.json` core fields + `lora_A`/`lora_B` key mapping
+- **`LinearWithLora` / `PeftLinearModel`**: real base Linear + LoRA residual forward for named modules
 - Multi-adapter **registry** (single active adapter; no weighted compose yet)
+- **LoRA parity fixtures** under `tests/parity/` (forward/merge allclose)
 
-## Non-goals (until later PRs)
+## Non-goals
 
-| Non-goal | Notes / when |
-|----------|----------------|
-| Full `PeftModel` base-model injection | Name-list registry only today → PR-041 |
-| HuggingFace `adapter_config.json` / weight key interop | Partial filenames only → PR-040 |
+| Non-goal | Notes |
+|----------|--------|
+| Full transformers model zoo / AutoModel | Caller supplies named `Linear`s |
+| Automatic `modules_to_save` training | Field preserved on `HfLoraConfig` only (see below) |
 | QLoRA / bitsandbytes / GPTQ / AWQ | Out of this crate; see qlora-rs ecosystem |
-| PeftTrainer / full training loop | `training` module = LR schedules + counters only |
+| PeftTrainer / full training loop | Use candle-nn AdamW on adapter `VarMap` (see example) |
 | Fused CUDA kernels (CubeCL) | **Quarantined** under `src/kernels/archive/` (PR-021) |
-| Numerical parity suite vs Python peft | Planned; METRICS.md scaffold only |
+| Full multi-tuner HF parity | LoRA is the product interop surface |
 
 ## Status matrix (honest)
 
-Legend: **done** = usable layer math / API · **partial** = real code but incomplete vs HF · **missing** = not implemented · **stub** = flag or shell without full behavior
+Legend: **done** = usable · **partial** = real code but incomplete vs HF · **missing** = not implemented · **stub** = flag/shell
 
 | Feature | Status | Notes |
 |---------|--------|-------|
-| LoRA linear layer | **partial** | Solid forward/merge/save; no bias / `modules_to_save` / HF keys |
+| LoRA linear layer | **done** (core) | Forward/merge/save; bias LoRA still missing |
 | rsLoRA scaling | **done** | `use_rslora` → `α/√r` |
-| LoRA dropout | **done** | Applied in forward when unfrozen and `dropout > 0` |
-| DoRA | **partial** | Magnitude/direction; falls back to LoRA without base weight; SaveLoad supported |
-| LoftQ init | **stub / simplified** | `loftq_iterations > 0` → dual-Gaussian init; **not** full SVD+quant LoftQ |
-| AdaLoRA | **partial** | SVD params + simplified mask (not full top-k budget trainer) |
-| IA³ / LoHa / LoKr | **partial** | Linear-shaped layers; limited options vs Python |
-| OFT / BOFT | **partial** | Nontrivial math; some options (e.g. BOFT dropout) incomplete |
-| VeRA | **partial** | Core frozen-random + scaling |
-| Prefix tuning | **partial / thin** | Tensors + getters; reparam unused; no attention inject |
-| Prompt tuning | **partial / thin** | Soft prompt prepend; text init unused |
-| Weight merge/unmerge | **partial** | Per-layer `Mergeable`; no model-level merge/unload |
-| Save/load safetensors | **partial** | Works for implementing adapters; schema ≠ HF peft |
+| LoRA dropout | **done** | Applied when unfrozen and `dropout > 0` |
+| HF `adapter_config.json` | **done** (LoRA core) | `peft_type`, `r`, `lora_alpha`, `target_modules`, optional base/task |
+| HF LoRA weight keys | **done** | `lora_A/B.default.weight` + module / `base_model.model` prefixes; native keys still default on save |
+| `LinearWithLora` inject | **done** | Base Linear + LoRA residual; base frozen if only adapter Vars optimized |
+| `get_peft_model` | **done** (Linear path) | Builds wrappers for pattern-matched modules; legacy registry → `get_peft_model_registry` |
+| LoRA parity fixtures | **done** | `tests/parity` allclose atol/rtol `1e-5` |
+| `modules_to_save` | **non-goal / config-only** | Serialized on HF config; not auto-trained |
+| DoRA | **partial** | Magnitude/direction; SaveLoad supported |
+| LoftQ init | **stub / simplified** | Dual-Gaussian; not full SVD+quant LoftQ |
+| AdaLoRA / IA³ / LoHa / LoKr / OFT / BOFT / VeRA | **partial** | Layer math; no HF key suite |
+| Prefix / Prompt tuning | **partial / thin** | Helpers only |
 | Multi-adapter registry | **partial** | Switch active; no weighted compose |
-| `PeftModel` / `get_peft_model` | **stub** | Module-name map, not base-model wrap |
-| Trainable freeze | **partial** | Layer flag; gates dropout; does **not** detach Candle Vars |
+| Trainable freeze | **partial** | Layer flag; gates dropout; does **not** detach Vars |
 | CUDA (candle) | **partial** | Feature enables candle CUDA device path only |
-| Fused GPU kernels | **missing (quarantined)** | Archive only; not exported or compiled |
-| QLoRA / quant backends | **missing** | Non-goal here |
-| HF full parity / trainer | **missing** | Explicit non-goals |
+| Fused GPU kernels | **missing (quarantined)** | Archive only |
+| QLoRA / full HF trainer | **missing** | Explicit non-goals |
 
-Showcase target later: **parity+** on fair layer fixtures (see METRICS.md). Numbers are **not yet measured**.
+Showcase: LoRA **correctness** goldens are green; wall-time vs HF peft **not yet measured** (METRICS.md).
 
 ## Features (Cargo)
 
@@ -75,10 +76,10 @@ There is **no** `cubecl` feature on this tree. Historical fused-kernel sources l
 
 ```toml
 [dependencies]
-peft-rs = "1.0"
+peft-rs = "1.1"
 
 # Optional: candle CUDA device support (not peft fused kernels)
-peft-rs = { version = "1.0", features = ["cuda"] }
+peft-rs = { version = "1.1", features = ["cuda"] }
 ```
 
 ## Installation
@@ -145,21 +146,68 @@ fn main() -> anyhow::Result<()> {
 
 ## Saving and Loading Adapters
 
-Adapters that implement `SaveLoad` can be stored with safetensors (Rust key names
-such as `lora_a.weight` — **not** HF `…lora_A.default.weight` yet):
+### Native keys (default `SaveLoad`)
+
+| Tensor | peft-rs native key |
+|--------|-------------------|
+| A | `lora_a.weight` |
+| B | `lora_b.weight` |
 
 ```rust
 use peft_rs::{LoraLayer, save_adapter_weights, load_adapter_weights, save_adapter_config, load_adapter_config};
 
-// Save adapter weights and config
 save_adapter_weights(&lora_layer, "adapter_weights.safetensors")?;
 save_adapter_config(&config, "adapter_config.json")?;
-
-// Load adapter weights and config
-let loaded_config = load_adapter_config("adapter_config.json")?;
-let mut loaded_layer = LoraLayer::new_with_zeros(768, 768, loaded_config, &device)?;
-load_adapter_weights(&mut loaded_layer, "adapter_weights.safetensors", &device)?;
 ```
+
+### HuggingFace PEFT LoRA interop (`hf` module)
+
+**Config** (`adapter_config.json`) via `HfLoraConfig`:
+
+| HF field | Maps to |
+|----------|---------|
+| `peft_type` | `"LORA"` |
+| `r` | `LoraConfig::r` |
+| `lora_alpha` | `LoraConfig::alpha` |
+| `target_modules` | `LoraConfig::target_modules` |
+| `base_model_name_or_path` | optional Hub/path metadata |
+| `task_type` | optional (e.g. `CAUSAL_LM`) |
+| `lora_dropout` | `LoraConfig::dropout` |
+| `modules_to_save` | **config-only** (not auto-trained) |
+
+**Weight keys** (load accepts all; HF save chooses style):
+
+| Style | Example |
+|-------|---------|
+| Native | `lora_a.weight` |
+| HF bare | `lora_A.default.weight` |
+| HF module | `layers.0.q_proj.lora_A.default.weight` |
+| HF full | `base_model.model.… .lora_A.default.weight` |
+
+```rust
+use peft_rs::{
+    save_pretrained_hf, load_pretrained_hf, HfLoraConfig, LoraKeyStyle, LoraLayer, LoraConfig,
+};
+
+let hf_cfg = HfLoraConfig::from_lora_config(&config, Some("org/model".into()), Some("CAUSAL_LM".into()));
+save_pretrained_hf(&layer, &hf_cfg, "out_dir", &LoraKeyStyle::hf_module("model.layers.0.q_proj"))?;
+
+let mut layer2 = LoraLayer::new_with_zeros(768, 768, config, &device)?;
+let loaded = load_pretrained_hf(&mut layer2, "out_dir", &device, Some("model.layers.0.q_proj"))?;
+```
+
+### Linear inject + train (product path)
+
+```rust
+use peft_rs::{get_peft_model, LoraConfig};
+// base_modules: Vec<(String, candle_nn::Linear)>
+// adapter_vb: VarBuilder over a dedicated VarMap (base weights NOT in that map → frozen)
+let model = get_peft_model(base_modules, "mlp.*", config, "default", adapter_vb)?;
+let y = model.forward(&x)?;
+// AdamW on adapter_vm.all_vars() — see examples/lora_inject_train.rs
+```
+
+Legacy name-only registry (no base Linear): `get_peft_model_registry`.
 
 ## Multi-Adapter Support
 

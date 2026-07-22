@@ -252,6 +252,60 @@ impl LoraLayer {
         })
     }
 
+    /// Build a LoRA layer from explicit A/B weight tensors.
+    ///
+    /// * `lora_a` — shape `[r, in_features]`
+    /// * `lora_b` — shape `[out_features, r]`
+    ///
+    /// Used for HF weight inject and parity fixtures.
+    ///
+    /// # Errors
+    /// Returns an error if config is invalid or shapes do not match.
+    pub fn from_weights(
+        lora_a: Tensor,
+        lora_b: Tensor,
+        config: LoraConfig,
+    ) -> Result<Self> {
+        config.validate()?;
+        let scaling = if config.use_rslora {
+            config.alpha as f64 / (config.r as f64).sqrt()
+        } else {
+            config.alpha as f64 / config.r as f64
+        };
+
+        let a_dims = lora_a.dims();
+        let b_dims = lora_b.dims();
+        if a_dims.len() != 2 || b_dims.len() != 2 {
+            return Err(PeftError::InvalidConfig(
+                "lora_a and lora_b must be rank-2 tensors".into(),
+            ));
+        }
+        if a_dims[0] != config.r {
+            return Err(PeftError::ShapeMismatch {
+                expected: vec![config.r, a_dims.get(1).copied().unwrap_or(0)],
+                actual: a_dims.to_vec(),
+            });
+        }
+        if b_dims[1] != config.r {
+            return Err(PeftError::ShapeMismatch {
+                expected: vec![b_dims.first().copied().unwrap_or(0), config.r],
+                actual: b_dims.to_vec(),
+            });
+        }
+        let in_features = a_dims[1];
+        let out_features = b_dims[0];
+
+        Ok(Self {
+            lora_a: Linear::new(lora_a, None),
+            lora_b: Linear::new(lora_b, None),
+            scaling,
+            config,
+            in_features,
+            out_features,
+            frozen: false,
+        })
+    }
+
     /// Get the scaling factor.
     #[must_use]
     pub fn scaling(&self) -> f64 {
@@ -592,31 +646,19 @@ impl Trainable for DoraLayer {
 impl SaveLoad for LoraLayer {
     #[allow(clippy::similar_names)]
     fn state_dict(&self) -> Result<HashMap<String, Tensor>> {
+        // Native keys (stable peft-rs API). Use `crate::hf` helpers to emit HF keys.
         let mut state_dict = HashMap::new();
-
-        // Get lora_a weight
-        let lora_a_weight = self.lora_a.weight();
-        state_dict.insert("lora_a.weight".to_string(), lora_a_weight.clone());
-
-        // Get lora_b weight
-        let lora_b_weight = self.lora_b.weight();
-        state_dict.insert("lora_b.weight".to_string(), lora_b_weight.clone());
-
+        state_dict.insert("lora_a.weight".to_string(), self.lora_a.weight().clone());
+        state_dict.insert("lora_b.weight".to_string(), self.lora_b.weight().clone());
         Ok(state_dict)
     }
 
     #[allow(clippy::similar_names)]
     fn load_state_dict(&mut self, state_dict: HashMap<String, Tensor>) -> Result<()> {
-        if !state_dict.contains_key("lora_a.weight") || !state_dict.contains_key("lora_b.weight") {
-            return Err(PeftError::WeightLoad(
-                "Missing required keys in state_dict".to_string(),
-            ));
-        }
+        // Accept native (`lora_a.weight`) and HF-style (`lora_A.default.weight`, module prefixes).
+        let (lora_a_weight, lora_b_weight) =
+            crate::hf::extract_lora_ab(&state_dict, None, Some(crate::hf::DEFAULT_ADAPTER_NAME))?;
 
-        let lora_a_weight = state_dict.get("lora_a.weight").unwrap().clone();
-        let lora_b_weight = state_dict.get("lora_b.weight").unwrap().clone();
-
-        // Verify shapes match
         let lora_a_shape = lora_a_weight.dims();
         let lora_b_shape = lora_b_weight.dims();
 
@@ -634,10 +676,8 @@ impl SaveLoad for LoraLayer {
             });
         }
 
-        // Reconstruct Linear layers with the loaded tensors
         self.lora_a = Linear::new(lora_a_weight, None);
         self.lora_b = Linear::new(lora_b_weight, None);
-
         Ok(())
     }
 }

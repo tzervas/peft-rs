@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-07-22
+
+### Added
+- **PR-040 HF adapter I/O**
+  - `hf` module: `HfLoraConfig` (`peft_type`, `r`, `lora_alpha`, `target_modules`,
+    optional `base_model_name_or_path` / `task_type`, `modules_to_save` config-only)
+  - HF LoRA key styles: native, `lora_A.default.weight`, module-prefixed, `base_model.model.*`
+  - `save_pretrained_hf` / `load_pretrained_hf`, `extract_lora_ab`, key rewrite helpers
+  - `LoraLayer::load_state_dict` accepts HF or native keys
+  - Tests: `tests/hf_roundtrip.rs` + unit tests in `hf`
+- **PR-041 real inject path**
+  - `LinearWithLora` — base `candle_nn::Linear` + `LoraLayer` residual with real forward
+  - `PeftLinearModel` / `get_peft_model(base_modules, pattern, config, name, vb)` product path
+  - Legacy name-list API renamed to `get_peft_model_registry`
+  - Example `examples/lora_inject_train.rs` — multi-layer MLP + AdamW adapter updates (base frozen)
+  - Integration test `tests/inject_train.rs`
+  - `modules_to_save` policy documented as config-only non-goal for auto-training
+- **PR-042 parity fixtures**
+  - `tests/parity/fixtures/lora_fwd_merge.json` + `tests/parity_lora.rs` (atol/rtol `1e-5`)
+  - Offline generator `scripts/gen_lora_parity_fixture.py` (Python peft optional)
+  - `METRICS.md` correctness section filled for LoRA forward/merge
+
+### Changed
+- Package version **1.1.0** (minor: product inject + HF interop surface; registry API rename)
+- README status matrix updated for HF keys, inject, parity
+- `LoraLayer::from_weights` for fixture/HF inject construction
+
+### Migration
+- Callers of the old string-only `get_peft_model(&[&str], …)` must switch to
+  `get_peft_model_registry` or the new Linear-based `get_peft_model`.
+
 ## [1.0.4] - 2026-07-22
 
 ### Changed

@@ -11,11 +11,10 @@ trainer loop in this crate).
 
 | Horizon | Criteria | Status |
 |---------|----------|--------|
-| **Now (1.0.4 honesty train)** | Docs match code; overclaimed flags fixed or documented; default tests green; METRICS scaffold | **In progress / this release** |
-| **Near (HF interop)** | `adapter_config.json` + LoRA key names loadable from Python peft for core LoRA | **Not met** (PR-040) |
-| **Near (model path)** | Real Linear+adapter wrap / `get_peft_model` that owns a base module | **Not met** (PR-041) |
-| **Mid** | Numerical parity fixtures vs Python peft; freeze/grad truth on Var path | **Not met** |
-| **Later** | Optional fused CUDA kernels (CubeCL) if CI-proven; broader tuner surface | **Not met** / kernels quarantined |
+| **1.0.4 honesty train** | Docs match code; flags honesty; METRICS scaffold | **Met** |
+| **1.1.0 HF + inject + parity** | HF config/keys, Linear inject, LoRA goldens | **Met** (this release) |
+| **Mid** | freeze/grad truth on Var path; wall-time METRICS | **Not met** |
+| **Later** | Optional fused CUDA kernels; broader tuner surface | **Not met** / kernels quarantined |
 
 > **Do not claim “success criteria already met” or full Python parity.** Layer math
 > for several adapters exists; framework depth does not.
@@ -40,11 +39,11 @@ trainer loop in this crate).
 
 ## Remaining tasks
 
-- [ ] HF adapter_config schema + LoRA key interop (PEFT-P0-07/08)
-- [ ] Real PeftModel / get_peft_model path (PEFT-P0-09)
-- [ ] Golden numerical parity vs Python peft (PEFT-P0-10)
-- [ ] modules_to_save policy (PEFT-P0-11)
-- [ ] Training: real Var updates or explicit non-goal rename (PEFT-P0-12)
+- [x] HF adapter_config schema + LoRA key interop (PEFT-P0-07/08) — PR-040
+- [x] Real Linear inject / get_peft_model path (PEFT-P0-09) — PR-041
+- [x] Golden numerical parity for LoRA forward/merge (PEFT-P0-10) — PR-042
+- [x] modules_to_save policy documented config-only (PEFT-P0-11) — PR-041
+- [ ] Training: real Var updates or explicit non-goal rename (PEFT-P0-12) — partial: AdamW example exists; module still schedules-only
 - [ ] Multi-adapter weighted composition (PEFT-P1-01)
 - [ ] AdaLoRA top-k budget (PEFT-P1-02)
 - [ ] Prefix reparam + prompt text init (PEFT-P1-03)

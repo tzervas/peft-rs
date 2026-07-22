@@ -1,8 +1,8 @@
 //! # peft-rs
 //!
 //! Candle PEFT **adapter layer library** for Rust — modular parameter-efficient
-//! fine-tuning *layers* (forward / merge / save), not a drop-in HuggingFace PEFT
-//! framework.
+//! fine-tuning *layers* (forward / merge / save) plus a **Linear inject path**
+//! for named modules. Not a drop-in `HuggingFace` PEFT framework for full models.
 //!
 //! Implemented layer surfaces (depth varies; see README status matrix):
 //! - **`LoRA`** (Low-Rank Adaptation)
@@ -16,12 +16,18 @@
 //! - **`VeRA`** (Vector-based Random Matrix Adaptation)
 //! - **Prefix Tuning** / **Prompt Tuning** (thin embeddings helpers)
 //!
+//! ## Product path (1.1+)
+//!
+//! - [`LinearWithLora`] / [`PeftLinearModel`] / [`get_peft_model`] — real base
+//!   Linear + LoRA residual forward for caller-supplied modules
+//! - [`hf`] — HuggingFace `adapter_config.json` + `lora_A` / `lora_B` key interop
+//! - Parity fixtures under `tests/parity/` (LoRA forward/merge goldens)
+//!
 //! ## Non-goals (crate docs)
 //!
-//! Full base-model injection, HF checkpoint key parity, QLoRA, trainer loops, and
-//! fused CUDA kernels are **not** provided as complete features in this release.
-//! Historical CubeCL sources are quarantined under `src/kernels/archive/` and are
-//! **not** exported from this crate.
+//! Full transformers model zoo, QLoRA, PeftTrainer loops, and fused CUDA kernels
+//! are **not** provided as complete features. Historical CubeCL sources are
+//! quarantined under `src/kernels/archive/` and are **not** exported.
 //!
 //! ## Quick Start
 //!
@@ -51,6 +57,7 @@
 pub mod adapters;
 pub mod config;
 pub mod error;
+pub mod hf;
 pub mod io;
 pub mod model;
 pub mod registry;
@@ -72,12 +79,20 @@ pub use adapters::prefix_tuning::{PrefixTuningConfig, PrefixTuningLayer};
 pub use adapters::prompt_tuning::{PromptTuningConfig, PromptTuningLayer};
 pub use adapters::vera::{VeraConfig, VeraLayer};
 pub use error::{PeftError, Result};
+pub use hf::{
+    extract_lora_ab, hf_state_dict_to_native, insert_module_lora_weights, load_pretrained_hf,
+    native_state_dict_to_hf, pack_lora_state_dict, save_pretrained_hf, slice_module_state_dict,
+    HfLoraConfig, LoraKeyStyle, DEFAULT_ADAPTER_NAME, PEFT_TYPE_LORA,
+};
 pub use io::{
     load_adapter_config, load_adapter_weights, load_pretrained, save_adapter_config,
     save_adapter_weights, save_pretrained, SaveLoad, ADAPTER_CONFIG_FILENAME,
     ADAPTER_WEIGHTS_FILENAME,
 };
-pub use model::{get_peft_model, ModulePattern, PeftModel};
+pub use model::{
+    get_peft_model, get_peft_model_registry, LinearWithLora, ModulePattern, PeftLinearModel,
+    PeftModel,
+};
 pub use registry::AdapterRegistry;
 pub use training::{
     count_trainable_parameters, format_parameter_count, AdapterTrainingConfig,
