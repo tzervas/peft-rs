@@ -7,6 +7,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.4] - 2026-07-22
+
+### Changed
+- **Skew heal (SoT):** package version set to **1.0.4**, intentionally superseding crates.io / tag **1.0.3** as the forward Source of Truth (see `DECISION.md`).
+- Local tree was already a descendant of `v1.0.3` but had regressed `Cargo.toml` to 1.0.1 during workspace/fleet merges; version field corrected without resetting history.
+- `cuda` feature remains **candle-core/cuda only** on this tree (no optional `cubecl` / `cubecl-cuda` deps). Fused GPU kernels under `src/kernels/` stay on disk but are **not** exported from `lib.rs` pending PR-021 (rewire or quarantine).
+
+### Added
+- `DECISION.md` — formal restore-vs-supersede decision for ECO-P0-03 / PEFT-P0-02.
+
+### Fixed
+- Restored missing changelog sections for **1.0.2** and **1.0.3** that were dropped after the 1.0.3 publish line.
+
+### Notes
+- Full README / roadmap honesty reset → **PR-010**.
+- Kernels / CubeCL feature truth → **PR-021**.
+- Do not treat crates.io 1.0.3 as SoT for future commits; publish next from this tree as 1.0.4+.
+
+## [1.0.3] - 2026-01-28
+
+### Changed
+- Updated safetensors dependency from 0.4 to 0.7
+- Updated candle-core and candle-nn dependencies from 0.8 to 0.9
+- Added explicit workspace.dependencies section in Cargo.toml
+- Optional CubeCL deps under `cuda` feature; `pub mod kernels` gated on `cuda` (published surface on crates.io)
+
+### Fixed
+- Clippy lints for `manual_is_multiple_of` in boft.rs, lokr.rs, oft.rs
+- Clippy lint for `manual_midpoint` in training.rs
+
+## [1.0.2] - 2026-01-25
+
+### Changed
+- Migrated LoRA/DoRA GPU kernels to CubeCL 0.9 API
+- Kernel position variables now use correct types
+- Added proper usize casts at array index sites
+- `sync_cube()` replaces deprecated `sync_units()`
+- Wrapped kernel launches in unsafe blocks with SAFETY comments
+
 ## [1.0.1] - 2026-01-24
 
 ### Added
