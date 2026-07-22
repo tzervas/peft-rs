@@ -1,5 +1,9 @@
 # Gitleaks configuration
 # https://github.com/gitleaks/gitleaks
+#
+# Note: rule-scoped allowlists must be a TOML *table* (`[rules.allowlist]`),
+# not an array of tables (`[[rules.allowlist]]`). The latter decodes as a
+# slice and fails with: Rules[N].Allowlist expected a map, got 'slice'.
 
 title = "Gitleaks Config"
 
@@ -13,9 +17,11 @@ paths = [
     '''(^|/)target/''',
     '''(^|/)\.git/''',
     '''Cargo\.lock$''',
+    # Test / bench / example fixtures often contain dummy secrets
+    '''(^|/)tests/''',
+    '''(^|/)benches/''',
+    '''(^|/)examples/''',
 ]
-
-# Rust-specific patterns that may trigger false positives
 regexes = [
     # Test fixtures with dummy values
     '''(?i)test.*=.*["'][a-z0-9]{32,}["']''',
@@ -29,6 +35,13 @@ description = "Potential API key in Rust code"
 regex = '''(?i)(api[_-]?key|secret[_-]?key|auth[_-]?token)\s*[:=]\s*["'][a-zA-Z0-9]{20,}["']'''
 tags = ["key", "API"]
 
+[rules.allowlist]
+paths = [
+    '''tests/''',
+    '''benches/''',
+    '''examples/''',
+]
+
 [[rules]]
 id = "env-credential"
 description = "Hardcoded credential in env or config"
@@ -41,8 +54,7 @@ paths = [
     '''\.yml$''',
 ]
 
-# Allowlist for test files
-[[rules.allowlist]]
+[rules.allowlist]
 paths = [
     '''tests/''',
     '''benches/''',

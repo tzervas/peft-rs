@@ -9,6 +9,12 @@ on:
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
+  # Self-hosted runners share limited RAM across concurrent jobs; candle-core
+  # + gemm OOM (SIGKILL/exit 137) under high rustc parallelism.
+  CARGO_BUILD_JOBS: "2"
+  CARGO_INCREMENTAL: "0"
+  # Smaller debug info during CI compiles (still useful for panics).
+  CARGO_PROFILE_DEV_DEBUG: "line-tables-only"
 
 jobs:
   fmt:
@@ -50,8 +56,14 @@ jobs:
 
   test:
     name: Test Suite
+    # macos uses GitHub-hosted; everything else maps to self-hosted linux
+    # (windows matrix labels are intentional fleet mapping, not real Win hosts).
     runs-on: ${{ matrix.os == 'macos-latest' && 'macos-latest' || fromJSON('["self-hosted", "linux", "x64", "podman"]') }}
     strategy:
+      fail-fast: true
+      # Cap concurrent test jobs so self-hosted memory is not exhausted by
+      # parallel candle-core compiles (ubuntu+windows×stable/nightly).
+      max-parallel: 2
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
         rust: [stable, nightly]
@@ -84,8 +96,28 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-      - name: Install cargo-audit
-        run: cargo install cargo-audit
+      - name: Install cargo-audit (binary, no source build)
+        run: |
+          set -euo pipefail
+          export PATH="${HOME}/.cargo/bin:${PATH}"
+          if command -v cargo-audit >/dev/null 2>&1; then
+            cargo audit --version
+            exit 0
+          fi
+          # Prefer prebuilt release binary to avoid OOM from compiling audit deps
+          # under concurrent self-hosted CI load (exit 137 on cargo install).
+          # Tarball: cargo-audit-x86_64-.../cargo-audit (+ licenses/docs).
+          ver="0.22.2"
+          asset="cargo-audit-x86_64-unknown-linux-gnu-v${ver}.tgz"
+          url="https://github.com/rustsec/rustsec/releases/download/cargo-audit/v${ver}/${asset}"
+          mkdir -p "${HOME}/.cargo/bin"
+          tmp="$(mktemp -d)"
+          curl -fsSL "$url" | tar -xz -C "$tmp"
+          bin="$(find "$tmp" -type f -name cargo-audit | head -n1)"
+          install -m 0755 "$bin" "${HOME}/.cargo/bin/cargo-audit"
+          rm -rf "$tmp"
+          echo "${HOME}/.cargo/bin" >> "$GITHUB_PATH"
+          cargo audit --version
       - name: Run security audit
         run: cargo audit
 

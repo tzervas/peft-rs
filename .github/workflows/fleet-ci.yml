@@ -16,6 +16,13 @@ concurrency:
 permissions:
   contents: read
 
+env:
+  # Shared self-hosted runners: limit rustc parallelism to avoid SIGKILL/OOM
+  # when compiling candle-core (seen as exit 101, signal 9).
+  CARGO_BUILD_JOBS: "2"
+  CARGO_INCREMENTAL: "0"
+  CARGO_PROFILE_DEV_DEBUG: "line-tables-only"
+
 jobs:
   detect:
     name: detect stack
