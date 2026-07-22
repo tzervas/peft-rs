@@ -85,11 +85,9 @@ jobs:
     runs-on: [self-hosted, linux, x64, podman]
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - name: Install cargo-audit
-        run: cargo install cargo-audit
-      - name: Run security audit
-        run: cargo audit
+      - uses: rustsec/audit-action@v0.4.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
 
   doc:
     name: Documentation Build
