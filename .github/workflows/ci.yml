@@ -6,15 +6,20 @@ on:
   pull_request:
     branches: [ main, dev, testing ]
 
+# Serialize with fleet-ci on the same PR/ref so self-hosted RAM is not shared
+# across simultaneous candle/gemm compiles.
+concurrency:
+  group: peft-rs-rust-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
-  # Self-hosted runners share limited RAM across concurrent jobs; candle-core
-  # + gemm OOM (SIGKILL/exit 137) under high rustc parallelism.
-  CARGO_BUILD_JOBS: "2"
+  # Self-hosted runners: candle-core/pulp/gemm OOM under multi-job rustc
+  # (SIGKILL → exit 101/137). Single rustc process per job.
+  CARGO_BUILD_JOBS: "1"
   CARGO_INCREMENTAL: "0"
-  # Smaller debug info during CI compiles (still useful for panics).
-  CARGO_PROFILE_DEV_DEBUG: "line-tables-only"
+  CARGO_PROFILE_DEV_DEBUG: "0"
 
 jobs:
   fmt:
@@ -28,9 +33,40 @@ jobs:
       - name: Check formatting
         run: cargo fmt --all -- --check
 
+  # Lightweight: prebuilt cargo-audit binary (never cargo-install from source).
+  audit:
+    name: Security Audit
+    runs-on: [self-hosted, linux, x64, podman]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install cargo-audit (binary, no source build)
+        run: |
+          set -euo pipefail
+          export PATH="${HOME}/.cargo/bin:${PATH}"
+          if command -v cargo-audit >/dev/null 2>&1; then
+            cargo audit --version
+            exit 0
+          fi
+          ver="0.22.2"
+          asset="cargo-audit-x86_64-unknown-linux-gnu-v${ver}.tgz"
+          url="https://github.com/rustsec/rustsec/releases/download/cargo-audit/v${ver}/${asset}"
+          mkdir -p "${HOME}/.cargo/bin"
+          tmp="$(mktemp -d)"
+          curl -fsSL "$url" | tar -xz -C "$tmp"
+          bin="$(find "$tmp" -type f -name cargo-audit | head -n1)"
+          install -m 0755 "$bin" "${HOME}/.cargo/bin/cargo-audit"
+          rm -rf "$tmp"
+          echo "${HOME}/.cargo/bin" >> "$GITHUB_PATH"
+          cargo audit --version
+      - name: Run security audit
+        run: cargo audit
+
+  # Chain heavy compile jobs on self-hosted so only one rustc tree is active.
   clippy:
     name: Clippy Lint
     runs-on: [self-hosted, linux, x64, podman]
+    needs: [fmt]
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -56,17 +92,24 @@ jobs:
 
   test:
     name: Test Suite
-    # macos uses GitHub-hosted; everything else maps to self-hosted linux
-    # (windows matrix labels are intentional fleet mapping, not real Win hosts).
-    runs-on: ${{ matrix.os == 'macos-latest' && 'macos-latest' || fromJSON('["self-hosted", "linux", "x64", "podman"]') }}
+    # macos = GitHub-hosted; linux = self-hosted.
+    # Dropped fake windows-latest rows (also mapped to self-hosted linux → OOM).
+    runs-on: ${{ matrix.runner == 'macos' && 'macos-latest' || fromJSON('["self-hosted", "linux", "x64", "podman"]') }}
+    needs: [clippy]
     strategy:
-      fail-fast: true
-      # Cap concurrent test jobs so self-hosted memory is not exhausted by
-      # parallel candle-core compiles (ubuntu+windows×stable/nightly).
-      max-parallel: 2
+      fail-fast: false
+      # Serialize matrix: one compile at a time (esp. dual linux toolchains).
+      max-parallel: 1
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-        rust: [stable, nightly]
+        include:
+          - runner: linux
+            rust: stable
+          - runner: linux
+            rust: nightly
+          - runner: macos
+            rust: stable
+          - runner: macos
+            rust: nightly
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@master
@@ -86,44 +129,14 @@ jobs:
         uses: actions/cache@v4
         with:
           path: target
-          key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-build-target-${{ matrix.rust }}-${{ hashFiles('**/Cargo.lock') }}
       - name: Run tests
         run: cargo test --verbose
-
-  audit:
-    name: Security Audit
-    runs-on: [self-hosted, linux, x64, podman]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - name: Install cargo-audit (binary, no source build)
-        run: |
-          set -euo pipefail
-          export PATH="${HOME}/.cargo/bin:${PATH}"
-          if command -v cargo-audit >/dev/null 2>&1; then
-            cargo audit --version
-            exit 0
-          fi
-          # Prefer prebuilt release binary to avoid OOM from compiling audit deps
-          # under concurrent self-hosted CI load (exit 137 on cargo install).
-          # Tarball: cargo-audit-x86_64-.../cargo-audit (+ licenses/docs).
-          ver="0.22.2"
-          asset="cargo-audit-x86_64-unknown-linux-gnu-v${ver}.tgz"
-          url="https://github.com/rustsec/rustsec/releases/download/cargo-audit/v${ver}/${asset}"
-          mkdir -p "${HOME}/.cargo/bin"
-          tmp="$(mktemp -d)"
-          curl -fsSL "$url" | tar -xz -C "$tmp"
-          bin="$(find "$tmp" -type f -name cargo-audit | head -n1)"
-          install -m 0755 "$bin" "${HOME}/.cargo/bin/cargo-audit"
-          rm -rf "$tmp"
-          echo "${HOME}/.cargo/bin" >> "$GITHUB_PATH"
-          cargo audit --version
-      - name: Run security audit
-        run: cargo audit
 
   doc:
     name: Documentation Build
     runs-on: [self-hosted, linux, x64, podman]
+    needs: [test]
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -141,37 +154,11 @@ jobs:
         uses: actions/cache@v4
         with:
           path: target
-          key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-build-target-doc-${{ hashFiles('**/Cargo.lock') }}
       - name: Build documentation
         run: cargo doc --no-deps --document-private-items
       - name: Check for broken links
         run: cargo doc --no-deps
-
-  # coverage:
-  #   name: Code Coverage
-  #   runs-on: [self-hosted, linux, x64, podman]
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - uses: dtolnay/rust-toolchain@stable
-  #     - name: Install tarpaulin
-  #       run: cargo install cargo-tarpaulin
-  #     - name: Cache cargo registry
-  #       uses: actions/cache@v4
-  #       with:
-  #         path: ~/.cargo/registry
-  #         key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
-  #     - name: Cache cargo index
-  #       uses: actions/cache@v4
-  #       with:
-  #         path: ~/.cargo/git
-  #         key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
-  #     - name: Generate coverage
-  #       run: cargo tarpaulin --verbose --workspace --timeout 120 --out xml
-  #     - name: Upload coverage to Codecov
-  #       uses: codecov/codecov-action@v4
-  #       with:
-  #         files: ./cobertura.xml
-  #           fail_ci_if_error: false
 
   benchmark:
     name: Benchmark (on performance PRs)
@@ -194,6 +181,6 @@ jobs:
         uses: actions/cache@v4
         with:
           path: target
-          key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-build-target-bench-${{ hashFiles('**/Cargo.lock') }}
       - name: Run benchmarks
         run: cargo bench
