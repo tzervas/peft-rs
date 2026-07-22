@@ -1,51 +1,55 @@
 # PEFT-RS Task Tracker
 
-Honest implementation status for peft-rs. Prefer [README.md](../README.md) status
-matrix and [METRICS.md](../METRICS.md) over older “all complete” tables.
+Honest implementation status for **peft-rs 1.1.0**. Prefer [README.md](../README.md)
+status matrix and [METRICS.md](../METRICS.md) as the user-facing source of truth.
 
-> **Product class:** Candle PEFT adapter **layer library** — not full HF PEFT.
+> **Product class:** Candle PEFT adapter **layer library** + Linear inject path —
+> not full HuggingFace PEFT.
 
-## Status overview (2026-07-22 honesty reset)
+## Status overview (1.1.0)
 
 | Feature | Status | Notes |
 |---------|--------|-------|
-| **LoRA** | partial | Forward/merge/save; dropout applied when unfrozen; no HF keys |
-| **DoRA** | partial | Layer math + SaveLoad; fallback without base weight |
-| **AdaLoRA** | partial | SVD params; simplified mask vs full adaptive budget |
-| **IA³** | partial | Layer OK; no auto target inject |
-| **LoHa / LoKr** | partial | Linear implementations |
-| **OFT / BOFT** | partial | Math present; some options incomplete |
-| **VeRA** | partial | Core path |
-| **Prefix / Prompt** | thin | Embeddings helpers; limited integration |
-| **Adapter / Mergeable / Config traits** | done | Core interfaces |
-| **Trainable freeze** | partial | Flag + dropout gate; no Var detach |
-| **Weight I/O** | partial | safetensors; schema ≠ HF peft |
-| **PeftModel / get_peft_model** | stub | Name-list registry only |
-| **Multi-adapter registry** | done (core) | Switch + weighted residual compose |
-| **Training utilities** | partial | Schedules + `train_step_mse` (not full PeftTrainer) |
-| **Fused CUDA kernels** | quarantined | `src/kernels/archive/` — not built |
-| **QLoRA / quant** | bridge only | `quant` traits; codecs in qlora-rs |
-| **HF full interop** | missing | PR-040+ |
-| **METRICS vs Python peft** | scaffold | Numbers not yet measured |
+| **LoRA** | **done** (core) | Forward/merge/save; dropout when unfrozen; rsLoRA |
+| **DoRA** | **partial** | Layer math + SaveLoad; simplified without base |
+| **AdaLoRA** | **partial** | SVD params + **top-k** rank mask + cubic schedule |
+| **IA³ / LoHa / LoKr / OFT / BOFT / VeRA** | **partial** | Layer math; no HF key suite |
+| **Prefix / Prompt** | **experimental** | Reparam MLP + prepend helpers |
+| **Adapter / Mergeable / Trainable / SaveLoad** | **done** | Core traits |
+| **Trainable freeze** | **partial** | Flag + dropout gate; does not detach Vars |
+| **Weight I/O (native)** | **done** | safetensors helpers |
+| **HF adapter_config + LoRA keys** | **done** (LoRA) | `hf` module; product interop surface |
+| **`LinearWithLora` / `get_peft_model`** | **done** | Real residual forward; legacy → `get_peft_model_registry` |
+| **Multi-adapter registry** | **done** | Switch + weighted residual compose |
+| **Training utilities** | **done** (minimal) | `train_step_mse` / `train_step_with_loss` — not full PeftTrainer |
+| **Quant bridge** | **done** (traits only) | `quant` module; codecs in qlora-rs |
+| **LoRA parity fixtures** | **done** | `tests/parity` allclose 1e-5 |
+| **Criterion benches** | **done** (LoRA) | Numbers in METRICS.md (CPU baselines) |
+| **Fused CUDA kernels** | **quarantined** | `src/kernels/archive/` — not built |
+| **METRICS vs Python peft** | **partial** | Correctness done; wall-time vs peft not measured |
 
-## Open work (from UNIFIED_GAP_LEDGER)
+## Closed in 1.1.0
 
-| Gap | Topic | Wave |
-|-----|--------|------|
-| PEFT-P0-07/08 | HF config + weight keys | 3b |
-| PEFT-P0-09 | Real model inject | 3b |
-| PEFT-P0-10 | Numerical parity | 3b |
-| PEFT-P0-11 | modules_to_save | 3b |
-| PEFT-P0-12 | Real training step | **done** (`train_step_mse`) |
-| PEFT-P1-01 | Weighted multi-adapter | **done** |
-| PEFT-P1-02 | AdaLoRA top-k budget | **done** |
-| PEFT-P1-03 | Prefix reparam + prompt text init | **done** (experimental) |
-| PEFT-P1-04 | Quant bridge | **done** |
-| PEFT-P1-05/06 | Kernels restore / Conv2d-Embedding LoRA | open |
-| PEFT-P2-* | Extra tuners, benches, showcase metrics | 3c |
+- PEFT-P0-07/08 — HF config + weight keys  
+- PEFT-P0-09 — Real Linear inject  
+- PEFT-P0-10 — Numerical parity fixtures  
+- PEFT-P0-11 — `modules_to_save` policy (config-only non-goal)  
+- PEFT-P0-12 — Real train step  
+- PEFT-P1-01 — Weighted multi-adapter  
+- PEFT-P1-02 — AdaLoRA top-k  
+- PEFT-P1-03 — Prefix reparam + prompt text init  
+- PEFT-P1-04 — Quant bridge traits  
+- PEFT-P2-02 — Non-empty LoRA benches  
 
-## Historical notes
+## Open work
 
-Earlier versions of this file marked nearly every row ✅ Complete. That overstated
-framework depth. Layer modules exist and unit tests pass; model integration,
-interop, and parity remain open.
+| Gap | Topic |
+|-----|--------|
+| PEFT-P1-05 | Optional CubeCL kernel restore **or** leave quarantined |
+| PEFT-P1-06 | Conv2d / Embedding LoRA targets |
+| PEFT-P2-01 | Additional tuners (p-tuning, X-LoRA, …) after core |
+| PEFT-P2-03 | Wall-time / RSS / throughput vs Python peft |
+
+## Non-goals
+
+Full transformers zoo, full QLoRA codecs, full PeftTrainer/datasets, drop-in HF PEFT.
