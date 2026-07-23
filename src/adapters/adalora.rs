@@ -156,7 +156,7 @@ impl AdapterConfig for AdaLoraConfig {
 pub struct AdaLoraLayer {
     /// Left singular vectors: [out_features, init_r]
     lora_a: Tensor,
-    /// Singular values: [init_r]
+    /// Singular values: `[init_r]`
     lora_e: Tensor,
     /// Right singular vectors: [init_r, in_features]
     lora_b: Tensor,
