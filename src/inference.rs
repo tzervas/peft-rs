@@ -69,10 +69,13 @@ impl<A: Adapter> BatchAdapterSwitcher<A> {
         &mut self.registry
     }
 
-    /// Should apply adapter.
+    /// Should apply adapter residual.
+    ///
+    /// Returns `true` only if mode is `InferenceMode::Adapter`. If the mode is `Merged` or `BaseOnly`,
+    /// returns `false` to avoid double-applying or applying any adapter residual.
     #[must_use]
     pub fn should_apply_adapter(&self) -> bool {
-        !matches!(self.mode, InferenceMode::BaseOnly)
+        matches!(self.mode, InferenceMode::Adapter)
     }
 }
 
@@ -191,6 +194,7 @@ mod tests {
     use super::*;
     use crate::{LoraConfig, LoraLayer, PeftModel};
     use candle_core::{Device, Tensor};
+    use candle_nn::{VarBuilder, VarMap};
     use std::collections::HashMap;
 
     #[test]
@@ -238,6 +242,10 @@ mod tests {
         assert_eq!(switcher.mode(), InferenceMode::BaseOnly);
         assert!(!switcher.should_apply_adapter());
 
+        switcher.set_mode(InferenceMode::Merged);
+        assert_eq!(switcher.mode(), InferenceMode::Merged);
+        assert!(!switcher.should_apply_adapter());
+
         switcher.switch_adapter("task2")?;
         assert_eq!(switcher.active_adapter(), Some("task2"));
 
@@ -281,57 +289,101 @@ mod tests {
     }
 
     #[test]
-    fn test_switcher_merging() -> anyhow::Result<()> {
+    fn test_switcher_merging_math() -> anyhow::Result<()> {
         let device = Device::Cpu;
         let mut registry = AdapterRegistry::new();
-        let config = LoraConfig::default();
-        let adapter = LoraLayer::new_with_zeros(768, 768, config, &device)?;
+        let config = LoraConfig {
+            r: 4,
+            alpha: 8,
+            ..Default::default()
+        };
+
+        let varmap = VarMap::new();
+        let vb = VarBuilder::from_varmap(&varmap, candle_core::DType::F32, &device);
+        let adapter = LoraLayer::new(16, 16, config, vb)?;
         registry.register_adapter("task1", adapter)?;
 
         let switcher = BatchAdapterSwitcher::new(registry);
-        let base_weight = Tensor::zeros(&[768, 768], candle_core::DType::F32, &device)?;
+        // Random non-zero base weight
+        let base_weight = Tensor::randn(0.0f32, 1.0f32, (16, 16), &device)?;
 
+        // Merge and check dims
         let merged = switcher.merge_active(&base_weight)?;
-        assert_eq!(merged.dims(), &[768, 768]);
+        assert_eq!(merged.dims(), &[16, 16]);
 
+        // Unmerge and check correctness (must equal base_weight numerically!)
         let unmerged = switcher.unmerge_active(&merged)?;
-        assert_eq!(unmerged.dims(), &[768, 768]);
+        assert_eq!(unmerged.dims(), &[16, 16]);
+
+        let diff = (unmerged - &base_weight)?
+            .sqr()?
+            .sum_all()?
+            .to_scalar::<f32>()?;
+        assert!(diff < 1e-5, "Unmerged weight does not match base weight!");
+
+        // Also assert that merged weight is numerically different from base weight
+        let merge_diff = (merged - &base_weight)?
+            .sqr()?
+            .sum_all()?
+            .to_scalar::<f32>()?;
+        assert!(
+            merge_diff > 1e-5,
+            "Merged weight must be numerically different from base weight!"
+        );
 
         Ok(())
     }
 
     #[test]
-    fn test_peft_model_merging() -> anyhow::Result<()> {
+    fn test_peft_model_merging_math() -> anyhow::Result<()> {
         let device = Device::Cpu;
         let mut model: PeftModel<LoraLayer> = PeftModel::new();
-        let config = LoraConfig::default();
+        let config = LoraConfig {
+            r: 4,
+            alpha: 8,
+            ..Default::default()
+        };
+
+        let varmap = VarMap::new();
+        let vb = VarBuilder::from_varmap(&varmap, candle_core::DType::F32, &device);
 
         model.add_adapter("task1", "*", &["layer.0", "layer.1"], |_| {
-            LoraLayer::new_with_zeros(768, 768, config.clone(), &device)
+            LoraLayer::new(16, 16, config.clone(), vb.clone())
         })?;
 
         let mut base_weights = HashMap::new();
-        base_weights.insert(
-            "layer.0.weight".to_string(),
-            Tensor::zeros(&[768, 768], candle_core::DType::F32, &device)?,
-        );
-        base_weights.insert(
-            "layer.1.weight".to_string(),
-            Tensor::zeros(&[768, 768], candle_core::DType::F32, &device)?,
-        );
-        base_weights.insert(
-            "unrelated.weight".to_string(),
-            Tensor::zeros(&[100], candle_core::DType::F32, &device)?,
-        );
+        let l0_base = Tensor::randn(0.0f32, 1.0f32, (16, 16), &device)?;
+        let l1_base = Tensor::randn(0.0f32, 1.0f32, (16, 16), &device)?;
+        let unrelated = Tensor::randn(0.0f32, 1.0f32, (100,), &device)?;
+
+        base_weights.insert("layer.0.weight".to_string(), l0_base.clone());
+        base_weights.insert("layer.1.weight".to_string(), l1_base.clone());
+        base_weights.insert("unrelated.weight".to_string(), unrelated.clone());
 
         let merged_weights = model.merge_weights(&base_weights)?;
         assert_eq!(merged_weights.len(), 3);
-        assert_eq!(merged_weights["layer.0.weight"].dims(), &[768, 768]);
+        assert_eq!(merged_weights["layer.0.weight"].dims(), &[16, 16]);
         assert_eq!(merged_weights["unrelated.weight"].dims(), &[100]);
+
+        // Merged weights must be different from base weights
+        let diff_l0 = (&merged_weights["layer.0.weight"] - &l0_base)?
+            .sqr()?
+            .sum_all()?
+            .to_scalar::<f32>()?;
+        assert!(
+            diff_l0 > 1e-5,
+            "Layer 0 merged weight is identical to base!"
+        );
 
         let unmerged_weights = model.unmerge_weights(&merged_weights)?;
         assert_eq!(unmerged_weights.len(), 3);
-        assert_eq!(unmerged_weights["layer.0.weight"].dims(), &[768, 768]);
+
+        // Unmerged weights must equal original base weights
+        let diff_unmerged_l0 = (&unmerged_weights["layer.0.weight"] - &l0_base)?
+            .sqr()?
+            .sum_all()?
+            .to_scalar::<f32>()?;
+        assert!(diff_unmerged_l0 < 1e-5, "Layer 0 unmerged weight mismatch!");
 
         Ok(())
     }
@@ -340,17 +392,22 @@ mod tests {
     fn test_save_merged_model_and_export() -> anyhow::Result<()> {
         let device = Device::Cpu;
         let mut model: PeftModel<LoraLayer> = PeftModel::new();
-        let config = LoraConfig::default();
+        let config = LoraConfig {
+            r: 4,
+            alpha: 8,
+            ..Default::default()
+        };
+
+        let varmap = VarMap::new();
+        let vb = VarBuilder::from_varmap(&varmap, candle_core::DType::F32, &device);
 
         model.add_adapter("task1", "*", &["layer.0"], |_| {
-            LoraLayer::new_with_zeros(768, 768, config.clone(), &device)
+            LoraLayer::new(16, 16, config.clone(), vb.clone())
         })?;
 
         let mut base_weights = HashMap::new();
-        base_weights.insert(
-            "layer.0.weight".to_string(),
-            Tensor::zeros(&[768, 768], candle_core::DType::F32, &device)?,
-        );
+        let l0_base = Tensor::randn(0.0f32, 1.0f32, (16, 16), &device)?;
+        base_weights.insert("layer.0.weight".to_string(), l0_base.clone());
 
         let temp_dir = tempfile::TempDir::new()?;
         let path = temp_dir.path().join("merged.safetensors");
@@ -361,7 +418,13 @@ mod tests {
         // Load and check
         let loaded = candle_core::safetensors::load(&path, &device)?;
         assert!(loaded.contains_key("layer.0.weight"));
-        assert_eq!(loaded["layer.0.weight"].dims(), &[768, 768]);
+        assert_eq!(loaded["layer.0.weight"].dims(), &[16, 16]);
+
+        let diff = (&loaded["layer.0.weight"] - &l0_base)?
+            .sqr()?
+            .sum_all()?
+            .to_scalar::<f32>()?;
+        assert!(diff > 1e-5, "Saved merged weight should differ from base!");
 
         Ok(())
     }
