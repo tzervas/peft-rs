@@ -1,4 +1,13 @@
 //! Inference utilities for PEFT adapters.
+//!
+//! This module provides helpers for:
+//! - Setting inference modes (`InferenceMode`) to control adapter residual application.
+//! - Managing adapter lifecycle and switching at runtime via `BatchAdapterSwitcher`
+//!   (which switches the active adapter on the underlying registry).
+//! - Merging active adapter weights into base model weights and exporting them.
+//!
+//! Note: This module is NOT a complete model evaluation loop or dataset harness. It provides
+//! helpers for runtime switching, residual gating, and exporting merged weights to standard formats.
 
 use crate::error::{PeftError, Result};
 use crate::registry::AdapterRegistry;
@@ -17,6 +26,11 @@ pub enum InferenceMode {
 }
 
 /// Batch adapter switcher.
+///
+/// Manages runtime switching of active adapters on an underlying `AdapterRegistry`.
+///
+/// Note: The name "Batch" is historical for single-adapter active switching in this crate;
+/// it does not implement sequence-level or request-level dynamic batch routing.
 pub struct BatchAdapterSwitcher<A: Adapter> {
     registry: AdapterRegistry<A>,
     mode: InferenceMode,
@@ -71,8 +85,8 @@ impl<A: Adapter> BatchAdapterSwitcher<A> {
 
     /// Should apply adapter residual.
     ///
-    /// Returns `true` only if mode is `InferenceMode::Adapter`. If the mode is `Merged` or `BaseOnly`,
-    /// returns `false` to avoid double-applying or applying any adapter residual.
+    /// Returns `true` only if mode is `InferenceMode::Adapter`. If the mode is `Merged` (meaning
+    /// base weights are already merged) or `BaseOnly`, returns `false` to avoid double-applying.
     #[must_use]
     pub fn should_apply_adapter(&self) -> bool {
         matches!(self.mode, InferenceMode::Adapter)
@@ -425,6 +439,43 @@ mod tests {
             .sum_all()?
             .to_scalar::<f32>()?;
         assert!(diff > 1e-5, "Saved merged weight should differ from base!");
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_merge_weights_missing_base_key() -> anyhow::Result<()> {
+        let device = Device::Cpu;
+        let mut model: PeftModel<LoraLayer> = PeftModel::new();
+        let config = LoraConfig::default();
+
+        model.add_adapter("task1", "*", &["layer.0"], |_| {
+            LoraLayer::new_with_zeros(16, 16, config.clone(), &device)
+        })?;
+
+        let base_weights = HashMap::new(); // Empty!
+        let result = model.merge_weights(&base_weights);
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), PeftError::InvalidConfig(_)));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_switch_unknown_adapter_errors() -> anyhow::Result<()> {
+        let device = Device::Cpu;
+        let mut registry = AdapterRegistry::new();
+        let config = LoraConfig::default();
+        let adapter = LoraLayer::new_with_zeros(16, 16, config, &device)?;
+        registry.register_adapter("task1", adapter)?;
+
+        let mut switcher = BatchAdapterSwitcher::new(registry);
+        let result = switcher.switch_adapter("unknown");
+        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            PeftError::AdapterNotFound { .. }
+        ));
 
         Ok(())
     }
