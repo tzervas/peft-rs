@@ -85,7 +85,7 @@ impl AdapterConfig for Ia3Config {
 /// For feedforward modules: `output = base_layer(input * ia3_vector)`
 pub struct Ia3Layer {
     /// The learned scaling vector.
-    /// Shape: [out_features, 1] for non-feedforward, [1, in_features] for feedforward.
+    /// Shape: `[out_features, 1]` for non-feedforward, `[1, in_features]` for feedforward.
     ia3_l: Tensor,
     /// Configuration
     config: Ia3Config,
@@ -162,7 +162,7 @@ impl Ia3Layer {
     /// Apply IA³ scaling to input (for feedforward layers).
     ///
     /// # Arguments
-    /// * `input` - Input tensor [batch, seq_len, in_features]
+    /// * `input` - Input tensor `[batch, seq_len, in_features]`
     ///
     /// # Returns
     /// Scaled input tensor
@@ -184,7 +184,7 @@ impl Ia3Layer {
     /// Apply IA³ scaling to output (for non-feedforward layers).
     ///
     /// # Arguments
-    /// * `output` - Output tensor from base layer [batch, seq_len, out_features]
+    /// * `output` - Output tensor from base layer `[batch, seq_len, out_features]`
     ///
     /// # Returns
     /// Scaled output tensor

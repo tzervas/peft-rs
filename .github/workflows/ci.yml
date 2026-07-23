@@ -96,8 +96,12 @@ jobs:
         with:
           key: doc
       - name: Build documentation
+        env:
+          RUSTDOCFLAGS: -D warnings
         run: cargo doc --no-deps --document-private-items
       - name: Check for broken links
+        env:
+          RUSTDOCFLAGS: -D warnings
         run: cargo doc --no-deps
 
   benchmark:

@@ -332,13 +332,13 @@ impl LoraLayer {
         (self.lora_a.weight(), self.lora_b.weight())
     }
 
-    /// Get the shape of LoRA A weight: [r, in_features].
+    /// Get the shape of LoRA A weight: `[r, in_features]`.
     #[must_use]
     pub fn lora_a_shape(&self) -> Vec<usize> {
         self.lora_a.weight().dims().to_vec()
     }
 
-    /// Get the shape of LoRA B weight: [out_features, r].
+    /// Get the shape of LoRA B weight: `[out_features, r]`.
     #[must_use]
     pub fn lora_b_shape(&self) -> Vec<usize> {
         self.lora_b.weight().dims().to_vec()
@@ -444,7 +444,7 @@ impl Trainable for LoraLayer {
 pub struct DoraLayer {
     /// The underlying LoRA layer
     lora: LoraLayer,
-    /// Magnitude vector: [out_features]
+    /// Magnitude vector: `[out_features]`
     magnitude: Tensor,
     /// Base weight reference (for computing norms)
     base_weight: Option<Tensor>,
