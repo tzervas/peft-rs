@@ -1,16 +1,40 @@
 //! Model integration for PEFT adapters.
 //!
-//! This module provides functionality for:
-//! - Wrapping models with PEFT adapter management
-//! - Pattern matching for module names (e.g., `*.attention`, `layer.*`)
-//! - Per-module adapter injection and switching
+//! # Product path (1.1+)
+//!
+//! [`LinearWithLora`] wraps a candle [`Linear`] base layer plus a [`LoraLayer`]
+//! residual and implements a real forward:
+//!
+//! ```text
+//! y = Linear(x) + LoRA(x) * scaling
+//! ```
+//!
+//! [`PeftLinearModel`] / [`get_peft_model`] build named wrappers from a list of
+//! base modules (caller supplies the Linear weights — no full transformers port).
+//!
+//! # Legacy registry
+//!
+//! [`PeftModel`] remains a name→adapter map used for multi-adapter switching
+//! without owning base weights. Prefer [`PeftLinearModel`] when you need a
+//! trainable inject path.
+//!
+//! # `modules_to_save` policy (PEFT-P0-11)
+//!
+//! `HuggingFace` PEFT can fully fine-tune selected modules via `modules_to_save`.
+//! peft-rs **does not** implement automatic `modules_to_save` training:
+//! - The field is preserved on [`crate::hf::HfLoraConfig`] for config interop.
+//! - Callers that need full-module updates should train those candle modules
+//!   themselves (or leave them in the optimizer). Adapter inject only wraps
+//!   `target_modules` / named Linear layers you pass in.
 
 use std::collections::HashMap;
 
-use candle_core::Tensor;
+use candle_core::{Module as _, Tensor};
+use candle_nn::{Linear, VarBuilder};
 
+use crate::adapters::lora::{LoraConfig, LoraLayer};
 use crate::error::{PeftError, Result};
-use crate::traits::Adapter;
+use crate::traits::{Adapter, AdapterConfig, Mergeable};
 
 /// Pattern for matching module names.
 #[derive(Debug, Clone)]
@@ -55,17 +79,325 @@ impl ModulePattern {
     }
 }
 
-/// Adapter entry for a specific module.
+/// Candle `Linear` base weights + `LoRA` residual with a real forward pass.
+///
+/// Base weights are held as a plain [`Linear`] (typically **not** registered in
+/// the adapter `VarMap`, so `AdamW` on adapter vars leaves the base frozen).
+pub struct LinearWithLora {
+    /// Frozen (or caller-owned) base linear layer.
+    base: Linear,
+    /// `LoRA` residual adapter.
+    lora: LoraLayer,
+    /// Module name (for HF key prefixes / debugging).
+    name: String,
+}
+
+impl LinearWithLora {
+    /// Wrap an existing Linear with a newly constructed `LoRA` residual.
+    ///
+    /// # Errors
+    /// Returns an error if `LoRA` construction fails or weight shapes mismatch.
+    pub fn new(
+        name: impl Into<String>,
+        base: Linear,
+        config: LoraConfig,
+        vb: VarBuilder,
+    ) -> Result<Self> {
+        let w = base.weight();
+        let dims = w.dims();
+        if dims.len() != 2 {
+            return Err(PeftError::InvalidConfig(
+                "LinearWithLora expects rank-2 base weight [out, in]".into(),
+            ));
+        }
+        let out_features = dims[0];
+        let in_features = dims[1];
+        let lora = LoraLayer::new(in_features, out_features, config, vb)?;
+        Ok(Self {
+            base,
+            lora,
+            name: name.into(),
+        })
+    }
+
+    /// Wrap base Linear with an existing [`LoraLayer`].
+    ///
+    /// # Errors
+    /// Returns shape mismatch if adapter dims do not match the base weight.
+    pub fn from_parts(name: impl Into<String>, base: Linear, lora: LoraLayer) -> Result<Self> {
+        let dims = base.weight().dims();
+        if dims.len() != 2 {
+            return Err(PeftError::InvalidConfig(
+                "base weight must be rank-2".into(),
+            ));
+        }
+        let (out_f, in_f) = (dims[0], dims[1]);
+        let a = lora.lora_a_shape();
+        let b = lora.lora_b_shape();
+        if a.len() != 2 || b.len() != 2 || a[1] != in_f || b[0] != out_f {
+            return Err(PeftError::ShapeMismatch {
+                expected: vec![out_f, in_f],
+                actual: vec![
+                    b.first().copied().unwrap_or(0),
+                    a.get(1).copied().unwrap_or(0),
+                ],
+            });
+        }
+        Ok(Self {
+            base,
+            lora,
+            name: name.into(),
+        })
+    }
+
+    /// Module name.
+    #[must_use]
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    /// Base linear layer (weights are not updated by adapter-only optimizers).
+    #[must_use]
+    pub fn base(&self) -> &Linear {
+        &self.base
+    }
+
+    /// Mutable base access (for merge writeback etc.).
+    pub fn base_mut(&mut self) -> &mut Linear {
+        &mut self.base
+    }
+
+    /// `LoRA` adapter.
+    #[must_use]
+    pub fn lora(&self) -> &LoraLayer {
+        &self.lora
+    }
+
+    /// Mutable `LoRA` adapter.
+    pub fn lora_mut(&mut self) -> &mut LoraLayer {
+        &mut self.lora
+    }
+
+    /// Forward: `base(x) + lora(x)`.
+    ///
+    /// # Errors
+    /// Propagates candle / adapter errors.
+    pub fn forward(&self, input: &Tensor) -> Result<Tensor> {
+        let base_out = self.base.forward(input)?;
+        self.lora.forward(input, Some(&base_out))
+    }
+
+    /// Merge `LoRA` into a new weight tensor (does not mutate base in place).
+    ///
+    /// # Errors
+    /// Returns merge errors from the adapter.
+    pub fn merged_weight(&self) -> Result<Tensor> {
+        self.lora.merge(self.base.weight())
+    }
+
+    /// Number of `LoRA` trainable parameters.
+    #[must_use]
+    pub fn num_adapter_parameters(&self) -> usize {
+        self.lora.num_parameters()
+    }
+}
+
+/// Ordered collection of [`LinearWithLora`] modules with a real multi-layer forward.
+///
+/// This is the **product inject path** for tiny stacks and custom candle models.
+pub struct PeftLinearModel {
+    /// Named modules in insertion order.
+    modules: Vec<LinearWithLora>,
+    /// Index by name for lookup.
+    index: HashMap<String, usize>,
+    /// Active adapter label (single adapter per module today).
+    active_adapter: String,
+    /// Shared `LoRA` config snapshot.
+    config: LoraConfig,
+}
+
+impl PeftLinearModel {
+    /// Build from ordered `(name, Linear)` pairs, injecting `LoRA` into each.
+    ///
+    /// Adapter parameters are created under `vb.pp(name)` so a single
+    /// [`candle_nn::VarMap`] can drive `AdamW` on all adapter weights.
+    /// Base Linear tensors are **not** put into that `VarMap` by this constructor
+    /// (base frozen for adapter-only training).
+    ///
+    /// # Errors
+    /// Returns an error if any module fails construction or names collide.
+    #[allow(clippy::needless_pass_by_value)]
+    pub fn from_linears(
+        base_modules: Vec<(String, Linear)>,
+        config: LoraConfig,
+        adapter_name: impl Into<String>,
+        vb: VarBuilder,
+    ) -> Result<Self> {
+        config.validate()?;
+        let active_adapter = adapter_name.into();
+        let mut modules = Vec::with_capacity(base_modules.len());
+        let mut index = HashMap::new();
+
+        for (name, linear) in base_modules {
+            if index.contains_key(&name) {
+                return Err(PeftError::AdapterExists { name });
+            }
+            let layer = LinearWithLora::new(name.clone(), linear, config.clone(), vb.pp(&name))?;
+            index.insert(name, modules.len());
+            modules.push(layer);
+        }
+
+        Ok(Self {
+            modules,
+            index,
+            active_adapter,
+            config,
+        })
+    }
+
+    /// Active adapter name.
+    #[must_use]
+    pub fn active_adapter(&self) -> &str {
+        &self.active_adapter
+    }
+
+    /// `LoRA` config used at construction.
+    #[must_use]
+    pub fn config(&self) -> &LoraConfig {
+        &self.config
+    }
+
+    /// Module names in forward order.
+    #[must_use]
+    pub fn module_names(&self) -> Vec<&str> {
+        self.modules.iter().map(LinearWithLora::name).collect()
+    }
+
+    /// Number of wrapped modules.
+    #[must_use]
+    pub fn num_modules(&self) -> usize {
+        self.modules.len()
+    }
+
+    /// Total adapter parameters across modules.
+    #[must_use]
+    pub fn num_adapter_parameters(&self) -> usize {
+        self.modules
+            .iter()
+            .map(LinearWithLora::num_adapter_parameters)
+            .sum()
+    }
+
+    /// Get a module by name.
+    ///
+    /// # Errors
+    /// Returns [`PeftError::AdapterNotFound`] if missing.
+    pub fn get(&self, name: &str) -> Result<&LinearWithLora> {
+        let idx = self
+            .index
+            .get(name)
+            .ok_or_else(|| PeftError::AdapterNotFound {
+                name: format!("module '{name}' not found"),
+            })?;
+        Ok(&self.modules[*idx])
+    }
+
+    /// Mutable module by name.
+    ///
+    /// # Errors
+    /// Returns [`PeftError::AdapterNotFound`] if missing.
+    pub fn get_mut(&mut self, name: &str) -> Result<&mut LinearWithLora> {
+        let idx = self
+            .index
+            .get(name)
+            .ok_or_else(|| PeftError::AdapterNotFound {
+                name: format!("module '{name}' not found"),
+            })?;
+        Ok(&mut self.modules[*idx])
+    }
+
+    /// Sequential forward through all modules (tiny MLP / stack).
+    ///
+    /// # Errors
+    /// Propagates layer errors.
+    pub fn forward(&self, input: &Tensor) -> Result<Tensor> {
+        let mut x = input.clone();
+        for module in &self.modules {
+            x = module.forward(&x)?;
+        }
+        Ok(x)
+    }
+
+    /// Forward a single named module.
+    ///
+    /// # Errors
+    /// Missing module or forward failure.
+    pub fn forward_module(&self, name: &str, input: &Tensor) -> Result<Tensor> {
+        self.get(name)?.forward(input)
+    }
+
+    /// Iterate modules in order.
+    pub fn iter(&self) -> impl Iterator<Item = &LinearWithLora> {
+        self.modules.iter()
+    }
+
+    /// Mutable iteration.
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut LinearWithLora> {
+        self.modules.iter_mut()
+    }
+}
+
+/// Inject `LoRA` into named Linear modules (product `get_peft_model` path).
+///
+/// This is the successor to the string-only registry: each matching base Linear
+/// becomes a [`LinearWithLora`] with a real forward.
+///
+/// # Arguments
+/// * `base_modules` — full list of `(name, Linear)` from the host model
+/// * `pattern` — which names receive `LoRA` (`*`, `*.q_proj`, exact, …)
+/// * `config` — `LoRA` hyperparameters (`target_modules` is **not** auto-applied;
+///   the `pattern` argument is the source of truth for injection)
+/// * `adapter_name` — label stored on the model (default adapter name for docs/HF)
+/// * `vb` — variable builder for trainable adapter weights
+///
+/// Modules that do **not** match `pattern` are dropped from the returned model
+/// (callers should keep non-target layers outside this wrapper). For a full
+/// network, compose matched [`LinearWithLora`] layers with plain Linears yourself.
+///
+/// # Errors
+/// Returns construction errors from [`PeftLinearModel::from_linears`].
+pub fn get_peft_model(
+    base_modules: Vec<(String, Linear)>,
+    pattern: &str,
+    config: LoraConfig,
+    adapter_name: impl Into<String>,
+    vb: VarBuilder,
+) -> Result<PeftLinearModel> {
+    let pat = ModulePattern::parse(pattern);
+    let selected: Vec<(String, Linear)> = base_modules
+        .into_iter()
+        .filter(|(name, _)| pat.matches(name))
+        .collect();
+    if selected.is_empty() {
+        return Err(PeftError::InvalidConfig(format!(
+            "no modules matched pattern '{pattern}' for LoRA injection"
+        )));
+    }
+    PeftLinearModel::from_linears(selected, config, adapter_name, vb)
+}
+
+/// Legacy name-list adapter registry (no base weights).
+///
+/// Prefer [`PeftLinearModel`] / [`get_peft_model`] for real inject + forward.
 struct ModuleAdapter<A: Adapter> {
-    /// The adapter instance
     adapter: A,
-    /// Whether this adapter is currently active
     active: bool,
 }
 
-/// PEFT model wrapper for managing adapters across modules.
+/// PEFT model wrapper for managing adapters across modules (registry only).
 ///
 /// Provides module-level adapter management with pattern-based targeting.
+/// Does **not** own base Linear weights — see [`PeftLinearModel`].
 pub struct PeftModel<A: Adapter> {
     /// Map of module names to their adapters
     module_adapters: HashMap<String, HashMap<String, ModuleAdapter<A>>>,
@@ -299,22 +631,14 @@ impl<A: Adapter> Default for PeftModel<A> {
     }
 }
 
-/// Create a PEFT model with adapters injected into matching modules.
+/// Create a **legacy** PEFT adapter registry (name-list only, no base Linear).
 ///
-/// This is a convenience function for common use cases.
-///
-/// # Arguments
-/// * `module_names` - List of all module names in the model
-/// * `pattern` - Pattern to match module names for adapter injection
-/// * `adapter_name` - Name for the adapter
-/// * `adapter_factory` - Function to create adapter instances
-///
-/// # Returns
-/// A `PeftModel` with adapters injected into matching modules
+/// For real base+adapter forward and training, use [`get_peft_model`] with
+/// `Vec<(String, Linear)>` instead.
 ///
 /// # Errors
 /// Returns an error if adapter creation fails
-pub fn get_peft_model<A: Adapter, F>(
+pub fn get_peft_model_registry<A: Adapter, F>(
     module_names: &[&str],
     pattern: &str,
     adapter_name: impl Into<String>,
@@ -329,10 +653,12 @@ where
 }
 
 #[cfg(test)]
+#[allow(clippy::similar_names)]
 mod tests {
     use super::*;
     use crate::{LoraConfig, LoraLayer};
     use candle_core::{DType, Device, Tensor};
+    use candle_nn::{linear_no_bias, VarBuilder, VarMap};
 
     #[test]
     fn test_module_pattern_exact() {
@@ -486,13 +812,13 @@ mod tests {
     }
 
     #[test]
-    fn test_get_peft_model() -> Result<()> {
+    fn test_get_peft_model_registry() -> Result<()> {
         let device = Device::Cpu;
         let config = LoraConfig::default();
 
         let module_names = vec!["layer.0.attention", "layer.0.mlp", "layer.1.attention"];
 
-        let model = get_peft_model(&module_names, "*.attention", "lora", |_| {
+        let model = get_peft_model_registry(&module_names, "*.attention", "lora", |_| {
             LoraLayer::new_with_zeros(768, 768, config.clone(), &device)
         })?;
 
@@ -501,6 +827,74 @@ mod tests {
         assert!(model.has_adapter("layer.1.attention"));
         assert!(!model.has_adapter("layer.0.mlp"));
 
+        Ok(())
+    }
+
+    #[test]
+    fn test_linear_with_lora_forward_shape() -> Result<()> {
+        let device = Device::Cpu;
+        let varmap = VarMap::new();
+        let vb = VarBuilder::from_varmap(&varmap, DType::F32, &device);
+        // Base linear not in adapter varmap
+        let base_w = Tensor::randn(0f32, 0.02, (16, 16), &device)?;
+        let base = Linear::new(base_w, None);
+        let config = LoraConfig {
+            r: 4,
+            alpha: 8,
+            ..Default::default()
+        };
+        let layer = LinearWithLora::new("fc1", base, config, vb.pp("fc1"))?;
+        let x = Tensor::zeros(&[2, 3, 16], DType::F32, &device)?;
+        let y = layer.forward(&x)?;
+        assert_eq!(y.dims(), &[2, 3, 16]);
+        assert_eq!(layer.num_adapter_parameters(), 4 * (16 + 16));
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_peft_model_injects_linears() -> Result<()> {
+        let device = Device::Cpu;
+        let mut base_vm = VarMap::new();
+        let base_builder = VarBuilder::from_varmap(&base_vm, DType::F32, &device);
+        // Build two base linears (simulating host model params — we clone tensors out)
+        let l0 = linear_no_bias(8, 8, base_builder.pp("fc1"))?;
+        let l1 = linear_no_bias(8, 8, base_builder.pp("fc2"))?;
+        // Detach into plain Linears so adapter varmap is separate
+        let base_modules = vec![
+            (
+                "mlp.fc1".into(),
+                Linear::new(l0.weight().copy()?, l0.bias().cloned()),
+            ),
+            (
+                "mlp.fc2".into(),
+                Linear::new(l1.weight().copy()?, l1.bias().cloned()),
+            ),
+            (
+                "other".into(),
+                Linear::new(Tensor::zeros((8, 8), DType::F32, &device)?, None),
+            ),
+        ];
+
+        let adapter_vm = VarMap::new();
+        let adapter_builder = VarBuilder::from_varmap(&adapter_vm, DType::F32, &device);
+        let config = LoraConfig {
+            r: 2,
+            alpha: 4,
+            ..Default::default()
+        };
+        let model = get_peft_model(base_modules, "mlp.*", config, "default", adapter_builder)?;
+        assert_eq!(model.num_modules(), 2);
+        assert_eq!(model.module_names(), vec!["mlp.fc1", "mlp.fc2"]);
+
+        let x = Tensor::randn(0f32, 1f32, (1, 4, 8), &device)?;
+        let y = model.forward(&x)?;
+        assert_eq!(y.dims(), &[1, 4, 8]);
+
+        // Adapter varmap should hold LoRA params only
+        assert!(!adapter_vm.all_vars().is_empty());
+        // base varmap still independent
+        assert!(!base_vm.all_vars().is_empty());
+        let _ = &mut base_vm;
         Ok(())
     }
 }

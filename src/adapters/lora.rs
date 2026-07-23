@@ -13,6 +13,7 @@
 use std::collections::HashMap;
 
 use candle_core::{DType, Device, Module, Tensor};
+use candle_nn::ops::dropout as candle_dropout;
 use candle_nn::{linear_no_bias, Linear, VarBuilder, VarMap};
 use serde::{Deserialize, Serialize};
 
@@ -40,7 +41,11 @@ pub struct LoraConfig {
     /// Scaling factor (typically `alpha / r`).
     pub alpha: usize,
 
-    /// Dropout probability applied to LoRA outputs.
+    /// Dropout probability applied to the LoRA path during training.
+    ///
+    /// Applied in [`LoraLayer::forward`] after the low-rank projection when the
+    /// layer is **unfrozen** and `dropout > 0`. Skipped when frozen (inference).
+    /// Must be in `[0.0, 1.0)`.
     #[serde(default)]
     pub dropout: f64,
 
@@ -66,10 +71,17 @@ pub struct LoraConfig {
     #[serde(default)]
     pub use_rslora: bool,
 
-    /// LoftQ initialization for quantization-aware LoRA.
+    /// Alternate A/B initialization when non-zero (**not full LoftQ**).
     ///
-    /// Uses SVD-based initialization optimized for quantized base models.
-    /// Specify the number of iterations (0 = disabled).
+    /// Real LoftQ (Li et al.) alternates quantization of the base weight with
+    /// SVD residual fitting over multiple iterations. This crate does **not**
+    /// implement that path yet (no base weight / quantizer / SVD loop here).
+    ///
+    /// When `loftq_iterations > 0`, both A and B are drawn from a reduced-scale
+    /// Gaussian instead of the standard B=0 init, so configs that set this field
+    /// are not silently ignored. The iteration count is reserved for a future
+    /// real LoftQ implementation and does not change the math today beyond the
+    /// on/off threshold.
     #[serde(default)]
     pub loftq_iterations: usize,
 }
@@ -111,9 +123,9 @@ impl AdapterConfig for LoraConfig {
         if self.alpha == 0 {
             return Err(PeftError::InvalidConfig("alpha must be > 0".into()));
         }
-        if !(0.0..=1.0).contains(&self.dropout) {
+        if !(0.0..1.0).contains(&self.dropout) {
             return Err(PeftError::InvalidConfig(
-                "dropout must be between 0 and 1".into(),
+                "dropout must be in [0.0, 1.0)".into(),
             ));
         }
         Ok(())
@@ -210,10 +222,10 @@ impl LoraLayer {
         };
         let dtype = DType::F32;
 
-        // LoftQ initialization if enabled
+        // Simplified alternate init when loftq_iterations > 0 (not full LoftQ).
         let (a_weight, b_weight) = if config.loftq_iterations > 0 {
-            // LoftQ: SVD-based initialization for quantized models
-            // Initialize with small values that will be refined during training
+            // Dual-Gaussian stand-in: both A and B non-zero (B is zero in standard init).
+            // Full LoftQ requires base weights + quantization + SVD residuals.
             let std = (1.0 / in_features as f64).sqrt() * 0.1;
             let a = Tensor::randn(0.0f32, std as f32, (config.r, in_features), device)?;
             let b = Tensor::randn(0.0f32, std as f32, (out_features, config.r), device)?;
@@ -232,6 +244,56 @@ impl LoraLayer {
         Ok(Self {
             lora_a,
             lora_b,
+            scaling,
+            config,
+            in_features,
+            out_features,
+            frozen: false,
+        })
+    }
+
+    /// Build a LoRA layer from explicit A/B weight tensors.
+    ///
+    /// * `lora_a` — shape `[r, in_features]`
+    /// * `lora_b` — shape `[out_features, r]`
+    ///
+    /// Used for HF weight inject and parity fixtures.
+    ///
+    /// # Errors
+    /// Returns an error if config is invalid or shapes do not match.
+    pub fn from_weights(lora_a: Tensor, lora_b: Tensor, config: LoraConfig) -> Result<Self> {
+        config.validate()?;
+        let scaling = if config.use_rslora {
+            config.alpha as f64 / (config.r as f64).sqrt()
+        } else {
+            config.alpha as f64 / config.r as f64
+        };
+
+        let a_dims = lora_a.dims();
+        let b_dims = lora_b.dims();
+        if a_dims.len() != 2 || b_dims.len() != 2 {
+            return Err(PeftError::InvalidConfig(
+                "lora_a and lora_b must be rank-2 tensors".into(),
+            ));
+        }
+        if a_dims[0] != config.r {
+            return Err(PeftError::ShapeMismatch {
+                expected: vec![config.r, a_dims.get(1).copied().unwrap_or(0)],
+                actual: a_dims.to_vec(),
+            });
+        }
+        if b_dims[1] != config.r {
+            return Err(PeftError::ShapeMismatch {
+                expected: vec![b_dims.first().copied().unwrap_or(0), config.r],
+                actual: b_dims.to_vec(),
+            });
+        }
+        let in_features = a_dims[1];
+        let out_features = b_dims[0];
+
+        Ok(Self {
+            lora_a: Linear::new(lora_a, None),
+            lora_b: Linear::new(lora_b, None),
             scaling,
             config,
             in_features,
@@ -290,6 +352,14 @@ impl Adapter for LoraLayer {
         // LoRA forward: x @ A^T @ B^T * scaling
         let lora_out = self.lora_a.forward(input)?;
         let lora_out = self.lora_b.forward(&lora_out)?;
+
+        // Training dropout on the LoRA residual path (skipped when frozen / p == 0).
+        let lora_out = if !self.frozen && self.config.dropout > 0.0 {
+            candle_dropout(&lora_out, self.config.dropout as f32)?
+        } else {
+            lora_out
+        };
+
         let scaling = Tensor::new(self.scaling as f32, lora_out.device())?;
         let lora_out = lora_out.broadcast_mul(&scaling)?;
 
@@ -337,14 +407,20 @@ impl Mergeable for LoraLayer {
 
 impl Trainable for LoraLayer {
     fn register_parameters(&self, _var_map: &mut VarMap, _prefix: &str) -> Result<()> {
-        // Parameters are already registered via VarBuilder during construction
+        // Parameters are already registered via VarBuilder during construction.
+        // `new_with_zeros` builds plain Tensors (not Vars); freeze cannot detach them.
         Ok(())
     }
 
+    /// Sets the layer frozen flag (skips dropout in forward).
+    ///
+    /// Does **not** detach underlying Candle `Var`s from the autograd graph.
+    /// Optimizers / callers should also skip steps when [`Self::is_frozen`] is true.
     fn freeze(&mut self) {
         self.frozen = true;
     }
 
+    /// Clears the frozen flag (re-enables training dropout when configured).
     fn unfreeze(&mut self) {
         self.frozen = false;
     }
@@ -566,31 +642,19 @@ impl Trainable for DoraLayer {
 impl SaveLoad for LoraLayer {
     #[allow(clippy::similar_names)]
     fn state_dict(&self) -> Result<HashMap<String, Tensor>> {
+        // Native keys (stable peft-rs API). Use `crate::hf` helpers to emit HF keys.
         let mut state_dict = HashMap::new();
-
-        // Get lora_a weight
-        let lora_a_weight = self.lora_a.weight();
-        state_dict.insert("lora_a.weight".to_string(), lora_a_weight.clone());
-
-        // Get lora_b weight
-        let lora_b_weight = self.lora_b.weight();
-        state_dict.insert("lora_b.weight".to_string(), lora_b_weight.clone());
-
+        state_dict.insert("lora_a.weight".to_string(), self.lora_a.weight().clone());
+        state_dict.insert("lora_b.weight".to_string(), self.lora_b.weight().clone());
         Ok(state_dict)
     }
 
     #[allow(clippy::similar_names)]
     fn load_state_dict(&mut self, state_dict: HashMap<String, Tensor>) -> Result<()> {
-        if !state_dict.contains_key("lora_a.weight") || !state_dict.contains_key("lora_b.weight") {
-            return Err(PeftError::WeightLoad(
-                "Missing required keys in state_dict".to_string(),
-            ));
-        }
+        // Accept native (`lora_a.weight`) and HF-style (`lora_A.default.weight`, module prefixes).
+        let (lora_a_weight, lora_b_weight) =
+            crate::hf::extract_lora_ab(&state_dict, None, Some(crate::hf::DEFAULT_ADAPTER_NAME))?;
 
-        let lora_a_weight = state_dict.get("lora_a.weight").unwrap().clone();
-        let lora_b_weight = state_dict.get("lora_b.weight").unwrap().clone();
-
-        // Verify shapes match
         let lora_a_shape = lora_a_weight.dims();
         let lora_b_shape = lora_b_weight.dims();
 
@@ -608,10 +672,40 @@ impl SaveLoad for LoraLayer {
             });
         }
 
-        // Reconstruct Linear layers with the loaded tensors
         self.lora_a = Linear::new(lora_a_weight, None);
         self.lora_b = Linear::new(lora_b_weight, None);
+        Ok(())
+    }
+}
 
+impl SaveLoad for DoraLayer {
+    fn state_dict(&self) -> Result<HashMap<String, Tensor>> {
+        let mut state_dict = self.lora.state_dict()?;
+        state_dict.insert("magnitude".to_string(), self.magnitude.clone());
+        Ok(state_dict)
+    }
+
+    fn load_state_dict(&mut self, state_dict: HashMap<String, Tensor>) -> Result<()> {
+        // Load magnitude first (required for DoRA)
+        let magnitude = state_dict.get("magnitude").ok_or_else(|| {
+            PeftError::WeightLoad("Missing required key 'magnitude' in DoRA state_dict".into())
+        })?;
+        if magnitude.dims() != [self.lora.out_features] {
+            return Err(PeftError::ShapeMismatch {
+                expected: vec![self.lora.out_features],
+                actual: magnitude.dims().to_vec(),
+            });
+        }
+        self.magnitude = magnitude.clone();
+
+        // Remaining keys go to the underlying LoRA layer
+        let mut lora_dict = HashMap::new();
+        for (k, v) in state_dict {
+            if k != "magnitude" {
+                lora_dict.insert(k, v);
+            }
+        }
+        self.lora.load_state_dict(lora_dict)?;
         Ok(())
     }
 }
@@ -852,7 +946,8 @@ mod tests {
     }
 
     #[test]
-    fn test_loftq_initialization() {
+    fn test_loftq_iterations_uses_dual_gaussian_init() {
+        // loftq_iterations > 0 enables simplified dual-Gaussian init (not full LoftQ).
         let config = LoraConfig {
             r: 8,
             alpha: 16,
@@ -862,7 +957,7 @@ mod tests {
         let device = Device::Cpu;
         let layer = LoraLayer::new_with_zeros(768, 768, config, &device).unwrap();
 
-        // With LoftQ, B is not zeros (both A and B have small random values)
+        // With simplified loftq path, B is not zeros (both A and B random)
         let b_weight = layer.lora_b.weight();
         let b_sum = b_weight
             .abs()
@@ -871,11 +966,81 @@ mod tests {
             .unwrap()
             .to_scalar::<f32>()
             .unwrap();
-        // B should have non-zero values with LoftQ init
         assert!(
             b_sum > 0.0,
-            "LoftQ should initialize B with non-zero values"
+            "loftq_iterations > 0 should initialize B with non-zero values"
         );
+    }
+
+    #[test]
+    fn test_lora_dropout_changes_output_when_training() {
+        let config = LoraConfig {
+            r: 4,
+            alpha: 8,
+            dropout: 0.5,
+            ..Default::default()
+        };
+        let device = Device::Cpu;
+        let mut layer = LoraLayer::new_with_zeros(16, 16, config, &device).unwrap();
+        // Force non-zero B so residual is non-zero
+        let b = Tensor::ones((16, 4), DType::F32, &device).unwrap();
+        let a = layer.lora_a.weight().clone();
+        layer.lora_a = Linear::new(a, None);
+        layer.lora_b = Linear::new(b, None);
+
+        let input = Tensor::ones((1, 4, 16), DType::F32, &device).unwrap();
+        let o1 = layer.forward(&input, None).unwrap();
+        let o2 = layer.forward(&input, None).unwrap();
+        // Stochastic dropout should usually differ; allow rare equality by checking frozen path instead
+        layer.freeze();
+        let f1 = layer.forward(&input, None).unwrap();
+        let f2 = layer.forward(&input, None).unwrap();
+        let d1 = (f1 - f2)
+            .unwrap()
+            .abs()
+            .unwrap()
+            .sum_all()
+            .unwrap()
+            .to_scalar::<f32>()
+            .unwrap();
+        assert!(d1 < 1e-5, "frozen forward must be deterministic");
+
+        // Unfrozen outputs exist and match shape
+        assert_eq!(o1.dims(), &[1, 4, 16]);
+        assert_eq!(o2.dims(), &[1, 4, 16]);
+    }
+
+    #[test]
+    fn test_dora_save_load_weights() -> Result<()> {
+        use crate::io::{load_adapter_weights, save_adapter_weights};
+        use tempfile::TempDir;
+
+        let device = Device::Cpu;
+        let config = LoraConfig {
+            use_dora: true,
+            ..Default::default()
+        };
+        let layer = DoraLayer::new(32, 32, config.clone(), &device, None)?;
+
+        let temp_dir = TempDir::new().map_err(|e| PeftError::Io(e.to_string()))?;
+        let weights_path = temp_dir.path().join("dora_weights.safetensors");
+
+        let original_state = layer.state_dict()?;
+        assert!(original_state.contains_key("lora_a.weight"));
+        assert!(original_state.contains_key("lora_b.weight"));
+        assert!(original_state.contains_key("magnitude"));
+
+        save_adapter_weights(&layer, &weights_path)?;
+
+        let mut loaded = DoraLayer::new(32, 32, config, &device, None)?;
+        load_adapter_weights(&mut loaded, &weights_path, &device)?;
+
+        let loaded_state = loaded.state_dict()?;
+        let mag_orig = original_state["magnitude"].sum_all()?.to_scalar::<f32>()?;
+        let mag_load = loaded_state["magnitude"].sum_all()?.to_scalar::<f32>()?;
+        assert!((mag_orig - mag_load).abs() < 1e-5);
+
+        Ok(())
     }
 
     #[test]

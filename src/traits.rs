@@ -72,18 +72,32 @@ pub trait Mergeable: Adapter {
 }
 
 /// Trait for trainable adapters.
+///
+/// # Freeze honesty
+///
+/// Implementations set a **layer-level frozen flag**. That flag is used to gate
+/// training-only behavior (e.g. `LoRA` dropout). It does **not** reliably detach
+/// Candle `Var`s from autograd: constructors that materialize plain `Tensor`
+/// weights (`new_with_zeros`) have no grad membership to clear, and
+/// `VarBuilder`/`VarMap` paths still require the optimizer to honor
+/// [`Trainable::is_frozen`]. Full grad detach is deferred to a later PR.
 pub trait Trainable: Adapter {
     /// Register trainable parameters with the variable map.
+    ///
+    /// Many adapters treat this as a no-op when weights were already created via
+    /// `VarBuilder` during construction.
     ///
     /// # Errors
     ///
     /// Returns an error if parameter registration fails.
     fn register_parameters(&self, var_map: &mut VarMap, prefix: &str) -> Result<()>;
 
-    /// Freeze all adapter parameters (disable gradients).
+    /// Mark the adapter frozen (training-off / inference-oriented).
+    ///
+    /// See trait-level freeze honesty: this is a flag, not a full grad detach.
     fn freeze(&mut self);
 
-    /// Unfreeze all adapter parameters (enable gradients).
+    /// Mark the adapter unfrozen (training-on).
     fn unfreeze(&mut self);
 
     /// Check if the adapter is frozen.

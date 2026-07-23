@@ -235,6 +235,12 @@ impl AdaLoraLayer {
         self.current_rank
     }
 
+    /// Rank mask (`1` = kept singular value, `0` = pruned). Shape: `[init_r]`.
+    #[must_use]
+    pub fn rank_mask(&self) -> &Tensor {
+        &self.rank_mask
+    }
+
     /// Get the target rank.
     #[must_use]
     pub fn target_rank(&self) -> usize {
@@ -253,47 +259,108 @@ impl AdaLoraLayer {
         self.scaling
     }
 
-    /// Update the rank mask based on importance scores.
+    /// Update the rank mask by keeping the **top-`budget`** singular values
+    /// ranked by `importance_scores` (PEFT-P1-02).
+    ///
+    /// Ties are broken by ascending index after a host-side sort (`init_r` is
+    /// small — typically ≤ 64). Exactly `budget` entries are kept when
+    /// `0 < budget < init_r`.
     ///
     /// # Arguments
     /// * `importance_scores` - Importance score for each rank (length: `init_r`)
     /// * `budget` - Number of ranks to keep
     ///
     /// # Errors
-    /// Returns error if tensor operations fail.
+    /// Returns error if tensor operations fail or score length mismatches `init_r`.
     pub fn update_rank_mask(&mut self, importance_scores: &Tensor, budget: usize) -> Result<()> {
-        // Get the indices of top-k importance scores
-        // For simplicity, we'll create a mask based on a threshold
-        // In practice, this would involve sorting and selecting top-k
-
-        if budget >= self.config.init_r {
-            // Keep all ranks
-            self.rank_mask =
-                Tensor::ones(self.config.init_r, DType::F32, importance_scores.device())?;
-            self.current_rank = self.config.init_r;
-        } else if budget == 0 {
-            // Zero out all ranks
-            self.rank_mask =
-                Tensor::zeros(self.config.init_r, DType::F32, importance_scores.device())?;
-            self.current_rank = 0;
-        } else {
-            // Sort importance scores and keep top budget
-            // Note: This is a simplified version - in practice would use argsort
-            let scores = importance_scores.flatten_all()?;
-            let mean_score = scores.mean_all()?;
-            let mean: f32 = mean_score.to_scalar()?;
-
-            // Simple threshold-based approach
-            let threshold = Tensor::new(mean, importance_scores.device())?;
-            let mask = importance_scores.ge(&threshold)?;
-            self.rank_mask = mask.to_dtype(DType::F32)?;
-
-            // Update current rank (count non-zero elements)
-            let sum: f32 = self.rank_mask.sum_all()?.to_scalar()?;
-            self.current_rank = sum as usize;
+        let device = importance_scores.device();
+        let scores = importance_scores.flatten_all()?;
+        let n = scores.elem_count();
+        if n != self.config.init_r {
+            return Err(PeftError::ShapeMismatch {
+                expected: vec![self.config.init_r],
+                actual: vec![n],
+            });
         }
 
+        if budget >= self.config.init_r {
+            self.rank_mask = Tensor::ones(self.config.init_r, DType::F32, device)?;
+            self.current_rank = self.config.init_r;
+            return Ok(());
+        }
+        if budget == 0 {
+            self.rank_mask = Tensor::zeros(self.config.init_r, DType::F32, device)?;
+            self.current_rank = 0;
+            return Ok(());
+        }
+
+        // Host-side top-k: exact budget, stable for small init_r.
+        let values: Vec<f32> = scores.to_vec1()?;
+        let mut idxs: Vec<usize> = (0..values.len()).collect();
+        idxs.sort_by(|&i, &j| match values[j].partial_cmp(&values[i]) {
+            Some(o) => o.then_with(|| i.cmp(&j)),
+            None => i.cmp(&j),
+        });
+        let mut mask = vec![0.0f32; values.len()];
+        for &i in idxs.iter().take(budget) {
+            mask[i] = 1.0;
+        }
+        self.rank_mask = Tensor::new(mask.as_slice(), device)?;
+        self.current_rank = budget;
         Ok(())
+    }
+
+    /// Cubic rank budget schedule from AdaLoRA (arxiv:2303.10512).
+    ///
+    /// - `step < tinit`: full `init_r`
+    /// - `step >= total_step - tfinal`: `target_r`
+    /// - otherwise: cubic interpolate from `init_r` → `target_r`
+    #[must_use]
+    pub fn rank_budget_at_step(&self, step: usize) -> usize {
+        let tinit = self.config.tinit;
+        let tfinal = self.config.tfinal;
+        let total = self.config.total_step;
+        let init_r = self.config.init_r;
+        let target_r = self.config.target_r;
+
+        if step < tinit {
+            return init_r;
+        }
+        if total <= tfinal || step >= total.saturating_sub(tfinal) {
+            return target_r;
+        }
+        // Progress in (0, 1] over the budgeting phase.
+        let denom = (total - tfinal - tinit) as f64;
+        if denom <= 0.0 {
+            return target_r;
+        }
+        let t = (step - tinit) as f64 / denom;
+        // Cubic: budget = target + (init - target) * (1 - t)^3
+        let frac = (1.0 - t).max(0.0).powi(3);
+        let budget = target_r as f64 + (init_r as f64 - target_r as f64) * frac;
+        budget.round().clamp(target_r as f64, init_r as f64) as usize
+    }
+
+    /// Apply the schedule at `step`: recompute top-k mask from current importance.
+    ///
+    /// Mid-phase updates honor `delta_t` (plus the first budgeting step).
+    /// Warmup / final phases always refresh so rank matches schedule endpoints.
+    ///
+    /// # Errors
+    /// Propagates importance / mask errors.
+    pub fn update_rank_from_schedule(&mut self, step: usize) -> Result<()> {
+        let budget = self.rank_budget_at_step(step);
+        let scores = self.get_importance_scores()?;
+        let in_budget_phase = step >= self.config.tinit
+            && step < self.config.total_step.saturating_sub(self.config.tfinal);
+        if in_budget_phase
+            && self.config.delta_t > 1
+            && !step.is_multiple_of(self.config.delta_t)
+            && step != self.config.tinit
+        {
+            return Ok(());
+        }
+        self.update_rank_mask(&scores, budget)
     }
 
     /// Compute the orthogonal regularization loss.
@@ -325,6 +392,24 @@ impl AdaLoraLayer {
     pub fn get_importance_scores(&self) -> Result<Tensor> {
         // Simple importance: absolute value of singular values
         Ok(self.lora_e.abs()?)
+    }
+
+    /// Replace singular values `E` (length `init_r`) — useful for tests and
+    /// advanced schedulers that write importance-driven values.
+    ///
+    /// # Errors
+    /// Shape mismatch if `values` is not `[init_r]`.
+    #[allow(clippy::needless_pass_by_value)]
+    pub fn set_singular_values(&mut self, values: Tensor) -> Result<()> {
+        let n = values.flatten_all()?.elem_count();
+        if n != self.config.init_r {
+            return Err(PeftError::ShapeMismatch {
+                expected: vec![self.config.init_r],
+                actual: vec![n],
+            });
+        }
+        self.lora_e = values.flatten_all()?;
+        Ok(())
     }
 }
 
@@ -562,5 +647,85 @@ mod tests {
         let orth_loss = layer.orthogonal_regularization().unwrap();
         // Should be a scalar tensor (0-dimensional)
         assert!(orth_loss.dims().is_empty());
+    }
+
+    #[test]
+    fn test_adalora_topk_mask_exact_budget() {
+        let config = AdaLoraConfig {
+            init_r: 8,
+            target_r: 3,
+            total_step: 100,
+            tinit: 10,
+            tfinal: 10,
+            ..Default::default()
+        };
+        let device = Device::Cpu;
+        let mut layer = AdaLoraLayer::new(32, 32, config, &device).unwrap();
+
+        // Scores: indices 7,5,3 are top-3
+        let scores =
+            Tensor::from_slice(&[0.1f32, 0.2, 0.05, 0.9, 0.3, 0.8, 0.4, 1.0], (8,), &device)
+                .unwrap();
+        layer.update_rank_mask(&scores, 3).unwrap();
+        assert_eq!(layer.current_rank(), 3);
+        let mask: Vec<f32> = layer.rank_mask().flatten_all().unwrap().to_vec1().unwrap();
+        assert_eq!(mask.iter().filter(|&&v| v > 0.5).count(), 3);
+        // top scores at idx 7, 3, 5
+        assert!((mask[7] - 1.0).abs() < 1e-6);
+        assert!((mask[3] - 1.0).abs() < 1e-6);
+        assert!((mask[5] - 1.0).abs() < 1e-6);
+        assert!((mask[0] - 0.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_adalora_rank_budget_schedule() {
+        let config = AdaLoraConfig {
+            init_r: 12,
+            target_r: 4,
+            total_step: 100,
+            tinit: 10,
+            tfinal: 10,
+            ..Default::default()
+        };
+        let device = Device::Cpu;
+        let layer = AdaLoraLayer::new(16, 16, config, &device).unwrap();
+
+        assert_eq!(layer.rank_budget_at_step(0), 12); // warmup
+        assert_eq!(layer.rank_budget_at_step(9), 12);
+        assert_eq!(layer.rank_budget_at_step(95), 4); // final
+        assert_eq!(layer.rank_budget_at_step(100), 4);
+        // Mid: strictly between target and init
+        let mid = layer.rank_budget_at_step(50);
+        assert!((4..=12).contains(&mid), "mid budget={mid}");
+    }
+
+    #[test]
+    fn test_adalora_update_from_schedule() {
+        let config = AdaLoraConfig {
+            init_r: 8,
+            target_r: 2,
+            total_step: 20,
+            tinit: 2,
+            tfinal: 2,
+            delta_t: 1,
+            ..Default::default()
+        };
+        let device = Device::Cpu;
+        let mut layer = AdaLoraLayer::new(16, 16, config, &device).unwrap();
+        // Force distinct singular values for importance ordering
+        layer
+            .set_singular_values(
+                Tensor::from_slice(
+                    &[0.01f32, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08],
+                    (8,),
+                    &device,
+                )
+                .unwrap(),
+            )
+            .unwrap();
+        layer.update_rank_from_schedule(0).unwrap(); // warmup → budget 8
+        assert_eq!(layer.current_rank(), 8);
+        layer.update_rank_from_schedule(19).unwrap(); // final → budget 2
+        assert_eq!(layer.current_rank(), 2);
     }
 }
