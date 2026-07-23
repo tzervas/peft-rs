@@ -81,11 +81,11 @@ impl AdapterConfig for VeraConfig {
 pub struct VeraLayer {
     /// Frozen random projection A: `[r, in_features]`
     vera_a: Tensor,
-    /// Frozen random projection B: [`out_features`, r]
+    /// Frozen random projection B: `[out_features, r]`
     vera_b: Tensor,
     /// Trainable scaling vector d: `[r]`
     vera_d: Tensor,
-    /// Optional trainable bias b: [`out_features`]
+    /// Optional trainable bias b: `[out_features]`
     vera_b_bias: Option<Tensor>,
     /// Configuration
     config: VeraConfig,
