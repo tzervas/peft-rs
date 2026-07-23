@@ -22,6 +22,7 @@ status matrix and [METRICS.md](../METRICS.md) as the user-facing source of truth
 | **`LinearWithLora` / `get_peft_model`** | **done** | Real residual forward; legacy → `get_peft_model_registry` |
 | **Multi-adapter registry** | **done** | Switch + weighted residual compose |
 | **Training utilities** | **done** (minimal) | `train_step_mse` / `train_step_with_loss` — not full PeftTrainer |
+| **Inference utilities** | **partial** | `BatchAdapterSwitcher`, residual-gating `InferenceMode`, metrics, `merge_active`; not an eval harness |
 | **Quant bridge** | **done** (traits only) | `quant` module; codecs in qlora-rs |
 | **LoRA parity fixtures** | **done** | `tests/parity` allclose 1e-5 |
 | **Criterion benches** | **done** (LoRA) | Numbers in METRICS.md (CPU baselines) |
@@ -30,16 +31,16 @@ status matrix and [METRICS.md](../METRICS.md) as the user-facing source of truth
 
 ## Closed in 1.1.0
 
-- PEFT-P0-07/08 — HF config + weight keys  
-- PEFT-P0-09 — Real Linear inject  
-- PEFT-P0-10 — Numerical parity fixtures  
-- PEFT-P0-11 — `modules_to_save` policy (config-only non-goal)  
-- PEFT-P0-12 — Real train step  
-- PEFT-P1-01 — Weighted multi-adapter  
-- PEFT-P1-02 — AdaLoRA top-k  
-- PEFT-P1-03 — Prefix reparam + prompt text init  
-- PEFT-P1-04 — Quant bridge traits  
-- PEFT-P2-02 — Non-empty LoRA benches  
+- PEFT-P0-07/08 — HF config + weight keys
+- PEFT-P0-09 — Real Linear inject
+- PEFT-P0-10 — Numerical parity fixtures
+- PEFT-P0-11 — `modules_to_save` policy (config-only non-goal)
+- PEFT-P0-12 — Real train step
+- PEFT-P1-01 — Weighted multi-adapter
+- PEFT-P1-02 — AdaLoRA top-k
+- PEFT-P1-03 — Prefix reparam + prompt text init
+- PEFT-P1-04 — Quant bridge traits
+- PEFT-P2-02 — Non-empty LoRA benches
 
 ## Open work
 
@@ -49,6 +50,7 @@ status matrix and [METRICS.md](../METRICS.md) as the user-facing source of truth
 | PEFT-P1-06 | Conv2d / Embedding LoRA targets |
 | PEFT-P2-01 | Additional tuners (p-tuning, X-LoRA, …) after core |
 | PEFT-P2-03 | Wall-time / RSS / throughput vs Python peft |
+| PEFT-P2-04 | Inference eval harness / merged full-model export beyond `merge_active` |
 
 ## Non-goals
 

@@ -1,8 +1,8 @@
 # DECISION: peft-rs SoT vs crates.io 1.0.3 skew heal (PR-002)
 
-**Date:** 2026-07-22  
-**Agent:** Wave-3 G0-C  
-**Gaps:** ECO-P0-03, PEFT-P0-02  
+**Date:** 2026-07-22
+**Agent:** Wave-3 G0-C
+**Gaps:** ECO-P0-03, PEFT-P0-02
 **Status:** **Accepted — intentional supersede (option B)**
 
 ---

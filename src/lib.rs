@@ -62,6 +62,7 @@ pub mod adapters;
 pub mod config;
 pub mod error;
 pub mod hf;
+pub mod inference;
 pub mod io;
 pub mod model;
 pub mod quant;
@@ -88,6 +89,9 @@ pub use hf::{
     extract_lora_ab, hf_state_dict_to_native, insert_module_lora_weights, load_pretrained_hf,
     native_state_dict_to_hf, pack_lora_state_dict, save_pretrained_hf, slice_module_state_dict,
     HfLoraConfig, LoraKeyStyle, DEFAULT_ADAPTER_NAME, PEFT_TYPE_LORA,
+};
+pub use inference::{
+    validate_adapter_compatibility, BatchAdapterSwitcher, InferenceMetrics, InferenceMode,
 };
 pub use io::{
     load_adapter_config, load_adapter_weights, load_pretrained, save_adapter_config,

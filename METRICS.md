@@ -1,7 +1,7 @@
 # peft-rs Metrics
 
-**Status:** Correctness fixtures green (PR-042); **CPU LoRA wall-time baselines** from criterion (`--quick`) recorded for 1.1.0.  
-**Purpose:** Showcase-bar tracking for honesty releases.  
+**Status:** Correctness fixtures green (PR-042); **CPU LoRA wall-time baselines** from criterion (`--quick`) recorded for 1.1.0.
+**Purpose:** Showcase-bar tracking for honesty releases.
 **Product class:** Candle PEFT **adapter layer library** + Linear inject path (not a drop-in HF PEFT framework).
 
 ---
@@ -31,10 +31,10 @@ Fair comparisons must use the **same adapter math surface** (e.g. LoRA rank/alph
 
 ### Planned shapes (when wall-time numbers land)
 
-- Hidden sizes: 768, 2048  
-- Rank `r`: 8, 64  
-- Batch×seq: `(1, 128)`, `(4, 512)`  
-- DType: F32 CPU first; F16/BF16 CUDA optional  
+- Hidden sizes: 768, 2048
+- Rank `r`: 8, 64
+- Batch×seq: `(1, 128)`, `(4, 512)`
+- DType: F32 CPU first; F16/BF16 CUDA optional
 
 ---
 
@@ -131,10 +131,10 @@ cargo bench --bench adapters
 
 Record environment in every **wall-time** result row:
 
-- CPU model / GPU model  
-- `rustc` / candle versions  
-- Python `peft` / `torch` versions (if comparing)  
-- Date and git SHA  
+- CPU model / GPU model
+- `rustc` / candle versions
+- Python `peft` / `torch` versions (if comparing)
+- Date and git SHA
 
 ---
 
