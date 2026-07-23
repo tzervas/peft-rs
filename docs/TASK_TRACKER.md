@@ -30,16 +30,16 @@ status matrix and [METRICS.md](../METRICS.md) as the user-facing source of truth
 
 ## Closed in 1.1.0
 
-- PEFT-P0-07/08 — HF config + weight keys  
-- PEFT-P0-09 — Real Linear inject  
-- PEFT-P0-10 — Numerical parity fixtures  
-- PEFT-P0-11 — `modules_to_save` policy (config-only non-goal)  
-- PEFT-P0-12 — Real train step  
-- PEFT-P1-01 — Weighted multi-adapter  
-- PEFT-P1-02 — AdaLoRA top-k  
-- PEFT-P1-03 — Prefix reparam + prompt text init  
-- PEFT-P1-04 — Quant bridge traits  
-- PEFT-P2-02 — Non-empty LoRA benches  
+- PEFT-P0-07/08 — HF config + weight keys
+- PEFT-P0-09 — Real Linear inject
+- PEFT-P0-10 — Numerical parity fixtures
+- PEFT-P0-11 — `modules_to_save` policy (config-only non-goal)
+- PEFT-P0-12 — Real train step
+- PEFT-P1-01 — Weighted multi-adapter
+- PEFT-P1-02 — AdaLoRA top-k
+- PEFT-P1-03 — Prefix reparam + prompt text init
+- PEFT-P1-04 — Quant bridge traits
+- PEFT-P2-02 — Non-empty LoRA benches
 
 ## Open work
 
