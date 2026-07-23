@@ -10,7 +10,7 @@
 //! - Provides [`PrefixTuningLayer::concat_to_kv`] to prepend prefixes to caller K/V
 //! - Does **not** inject into candle-transformers models automatically
 //! - `Adapter::forward` remains a pass-through (prefixes are consumed via
-//!   [`get_prefix_keys`] / [`get_prefix_values`] / [`concat_to_kv`])
+//!   [`PrefixTuningLayer::get_prefix_keys`] / [`PrefixTuningLayer::get_prefix_values`] / [`PrefixTuningLayer::concat_to_kv`])
 //!
 //! Reference: <https://arxiv.org/abs/2101.00190>
 
@@ -100,7 +100,7 @@ impl AdapterConfig for PrefixTuningConfig {
 struct ReparamMlp {
     /// W1: [`prefix_dim`, hidden]
     w1: Tensor,
-    /// b1: [hidden]
+    /// b1: `[hidden]`
     b1: Tensor,
     /// W2: [hidden, 2 * `num_heads` * `head_dim`]
     w2: Tensor,
