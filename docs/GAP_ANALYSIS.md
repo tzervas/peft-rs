@@ -124,12 +124,13 @@ Implemented in `src/training.rs`:
 - ~~Mixed precision training support~~ (via candle)
 - ~~Learning rate scheduling for adapters~~ ✅
 
-#### ~~Evaluation/Inference~~ ✅ COMPLETED
-Implemented in `src/inference.rs`:
-- `InferenceMode` supporting adapter execution, merged weight execution, and base-only execution
-- `BatchAdapterSwitcher` for batch-level switching across registered adapters
-- `InferenceMetrics` for tracking call and switch statistics
-- Compatibility validation for multi-adapter environments
+#### Evaluation/Inference (🟡 Partial)
+- [x] Declared and exported inference utilities in `src/inference.rs`
+- [x] Batch adapter switcher API (`BatchAdapterSwitcher`)
+- [x] Inference execution mode scaffolding (`InferenceMode`)
+- [x] Inference metrics tracker (`InferenceMetrics`)
+- [ ] Direct weight merging integration in inference loops
+- [ ] Export to standard formats
 
 ## Recommended Implementation Order
 

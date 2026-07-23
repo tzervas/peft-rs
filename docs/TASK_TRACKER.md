@@ -28,7 +28,7 @@ This document tracks the implementation progress of features in peft-rs based on
 | **Model Integration** | ✅ Complete | 10 tests | PeftModel wrapper with pattern matching |
 | **Multi-Adapter Registry** | ✅ Complete | 12 tests | AdapterRegistry with switching |
 | **Training Utilities** | ✅ Complete | 9 tests | LR schedules, training state |
-| **Inference Utilities** | ✅ Complete | 4 tests | Batch switcher, execution mode, metrics, compatibility validation |
+| **Inference Utilities** | 🟡 Partial | 4 tests | Batch switcher, execution mode, metrics, compatibility validation |
 
 ### 🚧 In Progress / Pending Features
 
@@ -208,15 +208,15 @@ Implemented in `src/training.rs` with:
 ---
 
 ### 3.3 Evaluation/Inference Utilities
-**Status:** ✅ Complete
+**Status:** 🟡 Partial
 **Priority:** Low  
 **Estimated Effort:** 2-3 days
 
 **Tasks:**
-- [x] Batch adapter switching
-- [x] Merged inference mode execution helper
-- [x] Compatibility validation of adapters
-- [x] Inference execution metrics tracker
+- [x] Batch adapter switcher API
+- [x] Inference execution mode scaffolding and metrics tracking
+- [ ] Direct integration with `Mergeable::merge` for weight-merged execution
+- [ ] Export utilities
 
 ---
 
