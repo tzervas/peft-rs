@@ -131,10 +131,10 @@ impl PromptTuningLayer {
     /// Prepend soft prompts to input embeddings.
     ///
     /// # Arguments
-    /// * `input_embeds` - Input embeddings [batch, `seq_len`, hidden]
+    /// * `input_embeds` - Input embeddings `[batch, seq_len, hidden]`
     ///
     /// # Returns
-    /// Concatenated embeddings [batch, `num_virtual_tokens` + `seq_len`, hidden]
+    /// Concatenated embeddings `[batch, num_virtual_tokens + seq_len, hidden]`
     ///
     /// # Errors
     ///
