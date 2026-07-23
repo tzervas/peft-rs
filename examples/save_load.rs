@@ -7,6 +7,12 @@
 //! - Loading weights from file
 //! - Verifying the loaded weights match the original
 
+#![allow(
+    clippy::similar_names,
+    clippy::many_single_char_names,
+    clippy::too_many_lines,
+    clippy::items_after_statements
+)]
 use anyhow::Result;
 use candle_core::{Device, Tensor};
 use peft_rs::{
