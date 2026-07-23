@@ -40,7 +40,8 @@ jobs:
           fi
 
   trivy-fs:
-    name: trivy filesystem (vuln+secret+license)
+    # continue-on-error: true → advisory only (HONEST_CI: do not claim hard gate)
+    name: trivy filesystem (advisory)
     runs-on: [self-hosted, linux, x64, podman]
     continue-on-error: true
     steps:
