@@ -100,7 +100,7 @@ impl AdapterConfig for PrefixTuningConfig {
 struct ReparamMlp {
     /// W1: [`prefix_dim`, hidden]
     w1: Tensor,
-    /// b1: [hidden]
+    /// b1: `[hidden]`
     b1: Tensor,
     /// W2: [hidden, 2 * `num_heads` * `head_dim`]
     w2: Tensor,
