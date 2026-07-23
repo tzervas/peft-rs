@@ -45,12 +45,12 @@ Comparison between Rust **peft-rs 1.1.0** and HuggingFace Python PEFT.
 
 ## Remaining gaps (prioritized)
 
-1. Wall-time / RSS METRICS vs Python peft  
-2. Embedding / Conv2d LoRA targets  
-3. Optional kernel restore under feature  
-4. Broader HF key suites for non-LoRA adapters  
-5. Additional tuners only after above  
-6. Inference: full merged-model export / evaluation harness (helpers only today)  
+1. Wall-time / RSS METRICS vs Python peft
+2. Embedding / Conv2d LoRA targets
+3. Optional kernel restore under feature
+4. Broader HF key suites for non-LoRA adapters
+5. Additional tuners only after above
+6. Inference: full merged-model export / evaluation harness (helpers only today)
 
 ## References
 
