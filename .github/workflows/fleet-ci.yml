@@ -19,11 +19,18 @@ permissions:
   contents: read
 
 env:
-  # Minimize peak RSS on constrained self-hosted runners.
+  # Minimize peak RSS on constrained self-hosted / podman cgroup runners.
+  # CARGO_BUILD_JOBS=1 serializes crate graph builds (and feeds rustc jobserver).
+  # High codegen-units + jobs=1: many small CGUs processed one-at-a-time → lower
+  # peak RSS than codegen-units=1 (one giant LLVM unit), which SIGKILL'd syn and
+  # candle-core on trunk (jobs 89082681557 / 89086942622).
   CARGO_BUILD_JOBS: "1"
   CARGO_INCREMENTAL: "0"
   CARGO_PROFILE_DEV_DEBUG: "0"
-  RUSTFLAGS: "-C codegen-units=1 -C debuginfo=0"
+  CARGO_PROFILE_TEST_DEBUG: "0"
+  CARGO_PROFILE_DEV_CODEGEN_UNITS: "16"
+  CARGO_PROFILE_TEST_CODEGEN_UNITS: "16"
+  RUSTFLAGS: "-C debuginfo=0"
 
 jobs:
   detect:
@@ -49,12 +56,19 @@ jobs:
     needs: detect
     if: needs.detect.outputs.rust == 'true'
     runs-on: [self-hosted, linux, x64, podman]
+    # Serialize heavy rustc across branches so concurrent PRs do not stack
+    # candle-core compiles on the same memory-capped host.
+    concurrency:
+      group: peft-rs-fleet-rust-compile
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
       - name: free memory snapshot
         run: free -h || true
+      # check lib+bins+tests only — skip benches (criterion) to cut peak deps;
+      # product CI (ci.yml) still covers full --all-targets via clippy/bench paths.
       - name: cargo check
-        run: cargo check --workspace --all-targets
+        run: cargo check --workspace --tests
       - name: cargo test
         run: cargo test --workspace
 
