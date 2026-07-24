@@ -1,7 +1,9 @@
-# Fleet standard CI — self-hosted. Honest status on trunk via Actions badge.
-# Product Test Suite runs on GitHub-hosted (ci.yml) because self-hosted hosts
-# SIGKILL candle-core compiles under memory pressure. fleet-ci still exercises
-# the self-hosted path with extreme rustc memory limits.
+# Fleet standard CI.
+# Self-hosted podman runners SIGKILL rustc while compiling candle-core (full
+# codegen/link for cargo test) even with CARGO_BUILD_JOBS=1 and low debuginfo
+# (jobs 89082681557, 89086942622, 89571019523). Product Test Suite already runs
+# on GitHub-hosted (ci.yml). fleet-ci rust gate uses ubuntu-latest so trunk is
+# honestly green without dropping check/test coverage; detect stays self-hosted.
 name: fleet-ci
 
 on:
@@ -19,17 +21,10 @@ permissions:
   contents: read
 
 env:
-  # Minimize peak RSS on constrained self-hosted / podman cgroup runners.
-  # CARGO_BUILD_JOBS=1 serializes crate graph builds (and feeds rustc jobserver).
-  # High codegen-units + jobs=1: many small CGUs processed one-at-a-time → lower
-  # peak RSS than codegen-units=1 (one giant LLVM unit), which SIGKILL'd syn and
-  # candle-core on trunk (jobs 89082681557 / 89086942622).
   CARGO_BUILD_JOBS: "1"
   CARGO_INCREMENTAL: "0"
   CARGO_PROFILE_DEV_DEBUG: "0"
   CARGO_PROFILE_TEST_DEBUG: "0"
-  CARGO_PROFILE_DEV_CODEGEN_UNITS: "16"
-  CARGO_PROFILE_TEST_CODEGEN_UNITS: "16"
   RUSTFLAGS: "-C debuginfo=0"
 
 jobs:
@@ -55,18 +50,18 @@ jobs:
     name: cargo check/test
     needs: detect
     if: needs.detect.outputs.rust == 'true'
-    runs-on: [self-hosted, linux, x64, podman]
-    # Serialize heavy rustc across branches so concurrent PRs do not stack
-    # candle-core compiles on the same memory-capped host.
-    concurrency:
-      group: peft-rs-fleet-rust-compile
-      cancel-in-progress: false
+    # GitHub-hosted: self-hosted podman cgroups cannot complete candle-core
+    # full link for cargo test (SIGKILL). Coverage is unchanged vs prior intent.
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: fleet-ci-rust
       - name: free memory snapshot
         run: free -h || true
-      # check lib+bins+tests only — skip benches (criterion) to cut peak deps;
-      # product CI (ci.yml) still covers full --all-targets via clippy/bench paths.
       - name: cargo check
         run: cargo check --workspace --tests
       - name: cargo test
