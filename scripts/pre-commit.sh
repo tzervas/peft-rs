@@ -4,6 +4,16 @@
 
 set -e
 
+# Detect if nvcc is available
+USE_FEATURES=""
+if command -v nvcc &> /dev/null; then
+    USE_FEATURES="--all-features"
+    echo "✅ nvcc found, building with all features (including CUDA)"
+else
+    echo "⚠️  nvcc not found, building without CUDA features (CPU-only)"
+fi
+echo ""
+
 echo "Running pre-commit quality checks..."
 
 # 1. Format check
@@ -16,7 +26,7 @@ echo "✅ Code formatting passed"
 
 # 2. Clippy check
 echo "2. Running clippy..."
-if ! cargo clippy --all-targets --all-features -- -D warnings; then
+if ! cargo clippy --all-targets $USE_FEATURES -- -D warnings; then
     echo "❌ Clippy check failed. Fix warnings before committing."
     exit 1
 fi
@@ -24,7 +34,7 @@ echo "✅ Clippy passed"
 
 # 3. Test suite
 echo "3. Running test suite..."
-if ! cargo test --all-features; then
+if ! cargo test $USE_FEATURES; then
     echo "❌ Tests failed. Fix failing tests before committing."
     exit 1
 fi
