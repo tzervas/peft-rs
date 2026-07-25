@@ -17,8 +17,9 @@
 //! - [`InferenceMode::BaseOnly`]: ignore adapters entirely
 //!
 //! Actual weight merge for the active adapter is available via
-//! [`BatchAdapterSwitcher::merge_active`] when `A: Mergeable`. Full model export
-//! of merged state dicts is not provided here.
+//! [`BatchAdapterSwitcher::merge_active`] when `A: Mergeable`. Full state-dict
+//! merge + safetensors export is available via
+//! [`crate::model::PeftModel::merge_weights`] and [`save_merged_model`].
 
 use crate::error::{PeftError, Result};
 use crate::registry::AdapterRegistry;
@@ -133,6 +134,28 @@ impl<A: crate::traits::Mergeable> BatchAdapterSwitcher<A> {
     }
 }
 
+/// Merge active adapters from a [`crate::model::PeftModel`] into `base_weights`
+/// and write the result as a safetensors file.
+///
+/// Why: deployment often wants a single fused weight file without shipping
+/// adapter tensors or a runtime residual path. This is a thin compose of
+/// [`crate::model::PeftModel::merge_weights`] + `candle_core::safetensors::save`
+/// — it does **not** rewrite configs, tokenizer files, or non-weight artifacts.
+///
+/// # Errors
+/// Propagates merge failures and I/O errors from the safetensors write.
+#[allow(clippy::implicit_hasher)]
+pub fn save_merged_model<A: crate::traits::Mergeable, P: AsRef<std::path::Path>>(
+    peft_model: &crate::model::PeftModel<A>,
+    base_weights: &std::collections::HashMap<String, candle_core::Tensor>,
+    path: P,
+) -> Result<()> {
+    let merged_weights = peft_model.merge_weights(base_weights)?;
+    candle_core::safetensors::save(&merged_weights, path.as_ref())
+        .map_err(|e| PeftError::Io(format!("Failed to save merged model: {e}")))?;
+    Ok(())
+}
+
 /// Lightweight inference counters (caller-driven; no automatic timing).
 #[derive(Debug, Clone, Copy, Default)]
 pub struct InferenceMetrics {
@@ -210,6 +233,7 @@ mod tests {
     use super::*;
     use crate::adapters::lora::{LoraConfig, LoraLayer};
     use candle_core::{Device, Tensor};
+    use candle_nn::{VarBuilder, VarMap};
 
     #[test]
     fn test_inference_mode_default() {
@@ -337,6 +361,122 @@ mod tests {
         let unmerged = switcher.unmerge_active(&merged)?;
         assert_eq!(unmerged.dims(), base.dims());
 
+        Ok(())
+    }
+
+    #[test]
+    fn test_peft_model_merge_weights_roundtrip() -> Result<()> {
+        use crate::PeftModel;
+        use std::collections::HashMap;
+
+        let device = Device::Cpu;
+        // Gaussian so ΔW is nonzero under standard A-random/B-zero would not be.
+        let config = LoraConfig {
+            r: 4,
+            alpha: 8,
+            init_lora_weights: crate::adapters::lora::LoraInitialization::Gaussian,
+            ..Default::default()
+        };
+
+        let varmap = VarMap::new();
+        let vb = VarBuilder::from_varmap(&varmap, candle_core::DType::F32, &device);
+        let mut model: PeftModel<LoraLayer> = PeftModel::new();
+        model.add_adapter("task1", "*", &["layer.0", "layer.1"], |_| {
+            LoraLayer::new(16, 16, config.clone(), vb.clone())
+        })?;
+
+        let mut base_weights = HashMap::new();
+        let l0_base = Tensor::randn(0.0f32, 1.0f32, (16, 16), &device)?;
+        let l1_base = Tensor::randn(0.0f32, 1.0f32, (16, 16), &device)?;
+        let unrelated = Tensor::randn(0.0f32, 1.0f32, (100,), &device)?;
+        base_weights.insert("layer.0.weight".to_string(), l0_base.clone());
+        base_weights.insert("layer.1.weight".to_string(), l1_base.clone());
+        base_weights.insert("unrelated.weight".to_string(), unrelated.clone());
+
+        let merged_weights = model.merge_weights(&base_weights)?;
+        assert_eq!(merged_weights.len(), 3);
+        assert_eq!(merged_weights["layer.0.weight"].dims(), &[16, 16]);
+        assert_eq!(merged_weights["unrelated.weight"].dims(), &[100]);
+
+        let diff_l0 = (&merged_weights["layer.0.weight"] - &l0_base)?
+            .sqr()?
+            .sum_all()?
+            .to_scalar::<f32>()?;
+        assert!(
+            diff_l0 > 1e-5,
+            "Layer 0 merged weight must differ from base under Gaussian init"
+        );
+
+        let unmerged_weights = model.unmerge_weights(&merged_weights)?;
+        let diff_unmerged_l0 = (&unmerged_weights["layer.0.weight"] - &l0_base)?
+            .sqr()?
+            .sum_all()?
+            .to_scalar::<f32>()?;
+        assert!(
+            diff_unmerged_l0 < 1e-4,
+            "unmerge should recover base (got residual {diff_unmerged_l0})"
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_save_merged_model_export() -> Result<()> {
+        use crate::PeftModel;
+        use std::collections::HashMap;
+
+        let device = Device::Cpu;
+        let config = LoraConfig {
+            r: 4,
+            alpha: 8,
+            init_lora_weights: crate::adapters::lora::LoraInitialization::Gaussian,
+            ..Default::default()
+        };
+        let varmap = VarMap::new();
+        let vb = VarBuilder::from_varmap(&varmap, candle_core::DType::F32, &device);
+        let mut model: PeftModel<LoraLayer> = PeftModel::new();
+        model.add_adapter("task1", "*", &["layer.0"], |_| {
+            LoraLayer::new(16, 16, config.clone(), vb.clone())
+        })?;
+
+        let mut base_weights = HashMap::new();
+        let l0_base = Tensor::randn(0.0f32, 1.0f32, (16, 16), &device)?;
+        base_weights.insert("layer.0.weight".to_string(), l0_base.clone());
+
+        let temp_dir = tempfile::TempDir::new().map_err(|e| PeftError::Io(e.to_string()))?;
+        let path = temp_dir.path().join("merged.safetensors");
+        save_merged_model(&model, &base_weights, &path)?;
+        assert!(path.exists());
+
+        let loaded = candle_core::safetensors::load(&path, &device)
+            .map_err(|e| PeftError::Io(e.to_string()))?;
+        assert!(loaded.contains_key("layer.0.weight"));
+        assert_eq!(loaded["layer.0.weight"].dims(), &[16, 16]);
+        let diff = (&loaded["layer.0.weight"] - &l0_base)?
+            .sqr()?
+            .sum_all()?
+            .to_scalar::<f32>()?;
+        assert!(diff > 1e-5, "saved merged weight should differ from base");
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_merge_weights_missing_base_key() -> Result<()> {
+        use crate::PeftModel;
+        use std::collections::HashMap;
+
+        let device = Device::Cpu;
+        let config = LoraConfig::default();
+        let mut model: PeftModel<LoraLayer> = PeftModel::new();
+        model.add_adapter("task1", "*", &["layer.0"], |_| {
+            LoraLayer::new_with_zeros(16, 16, config.clone(), &device)
+        })?;
+
+        let base_weights = HashMap::new();
+        let result = model.merge_weights(&base_weights);
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), PeftError::InvalidConfig(_)));
         Ok(())
     }
 }
