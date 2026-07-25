@@ -91,8 +91,7 @@ pub use hf::{
     HfLoraConfig, LoraKeyStyle, DEFAULT_ADAPTER_NAME, PEFT_TYPE_LORA,
 };
 pub use inference::{
-    save_merged_model, validate_adapter_compatibility, BatchAdapterSwitcher, InferenceMetrics,
-    InferenceMode,
+    validate_adapter_compatibility, BatchAdapterSwitcher, InferenceMetrics, InferenceMode,
 };
 pub use io::{
     load_adapter_config, load_adapter_weights, load_pretrained, save_adapter_config,
