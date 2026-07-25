@@ -51,6 +51,10 @@ jobs:
     runs-on: [self-hosted, linux, x64, podman]
     steps:
       - uses: actions/checkout@v4
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: fleet-ci
       - name: free memory snapshot
         run: free -h || true
       - name: cargo check
