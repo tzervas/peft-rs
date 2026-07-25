@@ -81,6 +81,16 @@ opt-level = 0
 debug = false
 codegen-units = 1
 
+[profile.dev.build-override]
+opt-level = 0
+debug = false
+codegen-units = 1
+
+[profile.test.build-override]
+opt-level = 0
+debug = false
+codegen-units = 1
+
 [profile.test.package."*"]
 opt-level = 0
 debug = false
