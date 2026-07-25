@@ -1,7 +1,13 @@
 name: jules-automerge
 # Event-driven auto-merge for Jules PRs — no cron, no external actor.
 # Fires when a check suite completes; merges the PR only if it is a Jules PR,
-# is mergeable, and every non-skipped check has concluded success.
+# is mergeable, and every non-neutral check has concluded success.
+#
+# Contract notes:
+# - §4a: a skipped job is NOT a passing job. Skipped conclusions block merge.
+# - §6: only safe once real required checks actually report. Prefer landing
+#   fail-closed gates (#32) and product-CI centralization (#42) and reconciling
+#   protec-main required contexts before relying on this workflow.
 on:
   check_suite:
     types: [completed]
@@ -17,7 +23,7 @@ jobs:
   automerge:
     runs-on: ubuntu-latest
     steps:
-      - name: Enable auto-merge for green Jules PRs
+      - name: Auto-merge green Jules PRs (fail-closed on skip/missing)
         uses: actions/github-script@v7
         with:
           script: |
@@ -47,23 +53,39 @@ jobs:
                 continue;
               }
 
-              // Gate on the combined check-runs for the head SHA: every non-skipped,
-              // non-neutral check must be success. Skipped checks do not block.
+              // Gate on check-runs for the head SHA.
+              // HONEST_CI / contract §4a: skipped is NOT success. Neutral stays
+              // non-blocking (informational). Zero completed checks means nothing
+              // reported — refuse (required context hang is not a green light).
               const { data: runs } = await github.rest.checks.listForRef({
                 owner, repo, ref: full.head.sha, per_page: 100,
               });
-              const blocking = runs.check_runs.filter(c =>
-                !['skipped', 'neutral'].includes(c.conclusion));
-              const pending = blocking.filter(c => c.status !== 'completed');
-              const failed = blocking.filter(c => c.conclusion !== 'success');
-              if (pending.length) { core.info(`#${pr.number}: ${pending.length} checks pending`); continue; }
-              if (failed.length) { core.info(`#${pr.number}: ${failed.length} checks not green`); continue; }
+              const checks = runs.check_runs || [];
+              if (checks.length === 0) {
+                core.info(`#${pr.number}: zero check runs on head — refuse merge`);
+                continue;
+              }
+
+              const pending = checks.filter(c => c.status !== 'completed');
+              // Block on anything that is not success or neutral.
+              const notGreen = checks.filter(c =>
+                c.status === 'completed' && !['success', 'neutral'].includes(c.conclusion)
+              );
+              if (pending.length) {
+                core.info(`#${pr.number}: ${pending.length} checks pending`);
+                continue;
+              }
+              if (notGreen.length) {
+                const summary = notGreen.map(c => `${c.name}=${c.conclusion}`).join(', ');
+                core.info(`#${pr.number}: checks not green (${summary})`);
+                continue;
+              }
 
               try {
                 await github.rest.pulls.merge({
                   owner, repo, pull_number: pr.number, merge_method: 'squash',
                 });
-                core.info(`#${pr.number}: MERGED (Jules, all non-skipped checks green)`);
+                core.info(`#${pr.number}: MERGED (Jules, all completed checks success/neutral)`);
               } catch (e) {
                 core.warning(`#${pr.number}: merge failed — ${e.message}`);
               }
