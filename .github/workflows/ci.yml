@@ -1,10 +1,39 @@
+# Centralized CI — calls tzervas/mycelium-workflows for the lint/check/doc gate.
+#
+# PIN: @v1 is a moving major tag. Minor/patch policy changes arrive automatically;
+# a breaking change lands on v2 and this file must opt in.
+#
+# REQUIRED CONTEXTS ARE PRESERVED BY NAME. This repo's protec-main ruleset
+# requires `Format Check`, `Documentation Build` and `Security Audit` (among
+# others). A job that `uses:` a reusable workflow does not report under its own
+# name alone, so `Format Check`, `Clippy Lint` and `Documentation Build` are now
+# thin aggregates over the centralized call — the contexts keep reporting under
+# exactly the names the ruleset requires. Same pattern as fleet-ci.yml's `gate`.
+#
+# `Security Audit` and the `Test Suite` matrix are kept VERBATIM:
+#   * the prebuilt-binary cargo-audit step exists specifically to avoid rustup on
+#     constrained hosts, and has no reusable equivalent;
+#   * the os x rust matrix (ubuntu/macos x stable/nightly) cannot be expressed by
+#     a single reusable call, and macOS coverage must not be lost.
+#
+# RUNNER: ubuntu-latest at BOTH tiers, deliberately NOT the fleet default for
+# main. This repo already documents why: "self-hosted fleet hosts OOM (SIGKILL)
+# compiling candle-core/pulp even with CARGO_BUILD_JOBS=1. Product gate must be
+# reliable." That measurement still stands.
+#
+# `--document-private-items` is carried across via doc-args — the previous doc
+# job used it, so it checks MORE rustdoc warnings than the centralized default.
 name: CI
 
 on:
   push:
-    branches: [ main, dev, testing ]
+    branches: [main, dev, testing]
   pull_request:
-    branches: [ main, dev, testing ]
+    branches: [main, dev, testing]
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 concurrency:
   group: peft-rs-ci-${{ github.event.pull_request.number || github.ref }}
@@ -17,19 +46,66 @@ env:
   CARGO_PROFILE_DEV_DEBUG: "0"
 
 jobs:
-  fmt:
+  ci:
+    uses: tzervas/mycelium-workflows/.github/workflows/reusable-rust-ci.yml@v1
+    with:
+      rust-version: stable
+      # `check` at dev, `full` at main. The Test Suite matrix below owns test
+      # execution, so the dev tier does not run the suite twice.
+      depth: >-
+        ${{ (github.base_ref || github.ref_name) == 'main' && 'full' || 'check' }}
+      runner-labels: '["ubuntu-latest"]'
+      doc-args: '--document-private-items'
+      # Previously benches ran only on PRs labelled `performance`, so main could
+      # merge with stale benchmark evidence. The main tier now runs them to
+      # completion on every PR into main; dev just proves they still compile.
+      bench: >-
+        ${{ (github.base_ref || github.ref_name) == 'main' && 'run' || 'compile' }}
+
+  format-check:
+    # Required status-check context. Thin aggregate over the centralized gate,
+    # which runs `cargo fmt --all --check`.
     name: Format Check
+    needs: [ci]
+    if: always()
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt
-      - name: Check formatting
-        run: cargo fmt --all -- --check
+      - run: |
+          set -eu
+          res='${{ needs.ci.result }}'
+          echo "centralized gate result: $res"
+          [ "$res" = "success" ] || { echo "::error::centralized CI did not pass (result=$res)"; exit 1; }
 
-  # Prebuilt cargo-audit only — no rustup (avoids OOM on constrained hosts).
+  clippy-lint:
+    name: Clippy Lint
+    needs: [ci]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          set -eu
+          res='${{ needs.ci.result }}'
+          echo "centralized gate result: $res"
+          [ "$res" = "success" ] || { echo "::error::centralized CI did not pass (result=$res)"; exit 1; }
+
+  documentation-build:
+    # Required status-check context. The centralized gate runs
+    # `cargo doc --workspace --no-deps --document-private-items` with
+    # RUSTDOCFLAGS=-D warnings at the main tier.
+    name: Documentation Build
+    needs: [ci]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          set -eu
+          res='${{ needs.ci.result }}'
+          echo "centralized gate result: $res"
+          [ "$res" = "success" ] || { echo "::error::centralized CI did not pass (result=$res)"; exit 1; }
+
   audit:
+    # VERBATIM. Prebuilt cargo-audit only — no rustup (avoids OOM on constrained
+    # hosts). Required status-check context `Security Audit`.
     name: Security Audit
     runs-on: ubuntu-latest
     steps:
@@ -50,23 +126,12 @@ jobs:
           cargo-audit --version
           cargo-audit audit
 
-  clippy:
-    name: Clippy Lint
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy
-      - name: Cache cargo
-        uses: Swatinem/rust-cache@v2
-      - name: Run clippy
-        run: cargo clippy --all-targets -- -D warnings
-
   test:
+    # VERBATIM. GitHub-hosted runners: the self-hosted fleet OOMs (SIGKILL)
+    # compiling candle-core/pulp even with CARGO_BUILD_JOBS=1. The os x rust
+    # matrix cannot be expressed by a single reusable call and macOS coverage
+    # must not be lost, so this job stays inline.
     name: Test Suite
-    # GitHub-hosted runners: self-hosted fleet hosts OOM (SIGKILL) compiling
-    # candle-core/pulp even with CARGO_BUILD_JOBS=1. Product gate must be reliable.
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -84,32 +149,3 @@ jobs:
           key: test-${{ matrix.rust }}
       - name: Run tests
         run: cargo test --verbose
-
-  doc:
-    name: Documentation Build
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - name: Cache cargo
-        uses: Swatinem/rust-cache@v2
-        with:
-          key: doc
-      - name: Build documentation
-        run: cargo doc --no-deps --document-private-items
-      - name: Check for broken links
-        run: cargo doc --no-deps
-
-  benchmark:
-    name: Benchmark (on performance PRs)
-    runs-on: ubuntu-latest
-    if: contains(github.event.pull_request.labels.*.name, 'performance')
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - name: Cache cargo
-        uses: Swatinem/rust-cache@v2
-        with:
-          key: bench
-      - name: Run benchmarks
-        run: cargo bench
