@@ -113,13 +113,13 @@ struct ReparamMlp {
 ///
 /// Stores trainable prefix parameters and materializes per-layer K/V prefixes.
 pub struct PrefixTuningLayer {
-    /// When reparam: raw embeddings [`num_layers`, `num_prefix_tokens`, `prefix_dim`].
+    /// When reparam: raw embeddings `[num_layers, num_prefix_tokens, prefix_dim]`.
     /// When direct: unused (None).
     prefix_tokens: Option<Tensor>,
     /// Reparameterization MLP (when enabled).
     reparam: Option<ReparamMlp>,
     /// Direct prefix keys (when reparam disabled):
-    /// [`num_layers`, `num_prefix_tokens`, `num_heads`, `head_dim`]
+    /// `[num_layers, num_prefix_tokens, num_heads, head_dim]`
     prefix_keys: Option<Tensor>,
     /// Direct prefix values (when reparam disabled).
     prefix_values: Option<Tensor>,
