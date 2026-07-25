@@ -7,9 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Documentation
-- Refreshed `docs/TASK_TRACKER.md` and `docs/GAP_ANALYSIS.md` for **1.1.0** truth (no stale “stub inject” rows).
-- Added `docs/DEPENDENCIES.md` (foundation crate; no sister deps; no cycles).
+## [1.2.0] - TBD (blocked on operator merge of prerequisites into `dev`)
+
+Release PR is **draft / blocked**. Content below describes the consolidated PR set that must land on `dev` before this release is truthful. Do not publish until those PRs are merged and this branch is rebased.
+
+### Prerequisites (operator merge into `dev`, then refresh this branch)
+- **#31** — rustdoc: escape tensor-shape placeholders as code spans; `RUSTDOCFLAGS=-D warnings` in product CI doc jobs
+- **#30** — inference: honest residual-gating docs, public exports, `BatchAdapterSwitcher::merge_active` / `unmerge_active`, `PeftModel::merge_weights` / `unmerge_weights`, `save_merged_model`
+- **#32** — fleet-ci honesty: fail-closed `uv sync` / pytest; rename no-stack stub; label trivy advisory
+- **#38** — fix reopen-issues workflow YAML heredoc (`startup_failure`)
+- **#40** — local scripts: nvcc-aware `--all-features` for pre-commit/quality-check
+- **#42** — product CI caller for `reusable-rust-ci.yml@v1` with preserved required context names
+- **#41** — fleet workflow centralization (**blocked**: calls non-existent `reusable-fleet-*.yml` in mycelium-workflows)
+- **#37** — Jules automerge (**ordering**: only after fail-closed gates + ruleset contexts actually report)
+
+### Added
+- `PeftModel::merge_weights` / `unmerge_weights` — merge active adapters into a base state-dict map (HF-style `module.weight` keys or bare names)
+- `save_merged_model` — safetensors export of the merged map
+- Public re-exports of inference helpers (`BatchAdapterSwitcher`, `InferenceMode`, `InferenceMetrics`, `validate_adapter_compatibility`, `save_merged_model`)
+
+### Fixed
+- Unresolved rustdoc intra-doc links from tensor-shape placeholders (`[init_r]`, `[out_features]`, …) and unqualified prefix helper links
+- Product CI doc jobs treat rustdoc warnings as errors (`RUSTDOCFLAGS=-D warnings`)
+- Reopen-issues-off-main workflow startup failure (heredoc indent)
+- Jules automerge no longer treats `skipped` check conclusions as non-blocking (contract §4a)
+
+### Changed
+- Package version **1.2.0** (minor: additive public inference/merge export APIs after tagged 1.1.0)
+- Local quality scripts skip CUDA `--all-features` when `nvcc` is absent
+- Fleet-ci local jobs fail closed on missing pytest / failed uv sync (until replaced by honest reusables)
+
+### Versioning rationale
+- crates.io still at **1.0.3**; git tag **v1.1.0** already exists for the HF/inject/train/multi-adapter surface on `main`
+- Cargo.toml was already **1.1.0** (aligned with that tag) — **not** double-bumped to invent progress
+- Consolidated work adds public API → **minor** 1.1.0 → **1.2.0** under semver; major stays grandfathered at 1.x
+
+### Closed as duplicates during consolidation (do not re-open for the same intent)
+- Rustdoc cluster: #28, #29, #36, #39 → survivor **#31**
+- Inference cluster: #27, #33 → survivor **#30** (ported unique merge/export from #33)
 
 ## [1.1.0] - 2026-07-22
 

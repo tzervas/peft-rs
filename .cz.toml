@@ -1,0 +1,23 @@
+# Commitizen configuration (commitizen-tools).
+# Install (optional): pip install commitizen  OR  uv tool install commitizen
+# This file is valid without the CLI: agents follow CHANGELOG.md + semver on release PRs.
+
+[tool.commitizen]
+name = "cz_conventional_commits"
+version = "1.2.0"
+tag_format = "v$version"
+version_scheme = "semver"
+# Grandfathered 1.x on crates.io — do NOT set major_version_zero = true.
+major_version_zero = false
+
+# Keep these files lockstep on every release bump.
+# Paths verified present in this repo (no top-level VERSION file).
+version_files = [
+    "Cargo.toml:version",
+    "README.md:peft-rs = ",
+]
+
+update_changelog_on_bump = true
+changelog_file = "CHANGELOG.md"
+changelog_incremental = true
+# Prefer: cz bump --increment PATCH|MINOR|MAJOR

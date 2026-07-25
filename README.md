@@ -83,10 +83,10 @@ There is **no** `cubecl` feature on this tree. Historical fused-kernel sources l
 
 ```toml
 [dependencies]
-peft-rs = "1.1.0"
+peft-rs = "1.2.0"
 
 # Optional: candle CUDA device support (not peft fused kernels)
-peft-rs = { version = "1.1.0", features = ["cuda"] }
+peft-rs = { version = "1.2.0", features = ["cuda"] }
 ```
 
 ## Installation
