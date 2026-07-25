@@ -208,13 +208,13 @@ Implemented in `src/training.rs` with:
 ---
 
 ### 3.3 Evaluation/Inference Utilities
-**Status:** 🟡 Partial
+**Status:** ❌ Not Started
 **Priority:** Low  
 **Estimated Effort:** 2-3 days
 
 **Tasks:**
-- [x] Batch adapter switching (Implemented via `BatchAdapterSwitcher` in `src/inference.rs`)
-- [x] Merged inference mode (Supported via `InferenceMode::Merged` in `src/inference.rs` and `Mergeable` trait implementations)
+- [ ] Batch adapter switching
+- [ ] Merged inference mode
 - [ ] Export utilities
 
 ---
