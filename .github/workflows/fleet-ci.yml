@@ -57,6 +57,8 @@ jobs:
         run: rustc --version && cargo --version
       - name: free memory snapshot
         run: free -h || true
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
       - name: cargo check
         run: cargo check --workspace --all-targets
       - name: cargo test
