@@ -85,7 +85,7 @@ impl AdapterConfig for PromptTuningConfig {
 ///
 /// Maintains soft prompt embeddings that are prepended to input embeddings.
 pub struct PromptTuningLayer {
-    /// Soft prompt embeddings: [`num_virtual_tokens`, `hidden_size`]
+    /// Soft prompt embeddings: `[num_virtual_tokens, hidden_size]`
     soft_prompt: Tensor,
     /// Configuration
     config: PromptTuningConfig,

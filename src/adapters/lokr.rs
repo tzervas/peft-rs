@@ -79,14 +79,14 @@ impl AdapterConfig for LoKrConfig {
 /// `ΔW = (w1 ⊗ w2) @ (w1_b ⊗ w2_b)^T` approximated via low-rank factors.
 ///
 /// For simplicity, this implementation uses a factored approach:
-/// - `lokr_w1`: First Kronecker factor [factor_out, factor_in]
+/// - `lokr_w1`: First Kronecker factor `[factor_out, factor_in]`
 /// - `lokr_w2_a`, `lokr_w2_b`: Low-rank decomposition of second factor
 pub struct LoKrLayer {
-    /// First Kronecker factor: [factor_out, factor_in]
+    /// First Kronecker factor: `[factor_out, factor_in]`
     lokr_w1: Tensor,
-    /// Second factor A (low-rank): [remaining_out, r]
+    /// Second factor A (low-rank): `[remaining_out, r]`
     lokr_w2_a: Tensor,
-    /// Second factor B (low-rank): [r, remaining_in]
+    /// Second factor B (low-rank): `[r, remaining_in]`
     lokr_w2_b: Tensor,
     /// Scaling factor = alpha / r
     scaling: f64,

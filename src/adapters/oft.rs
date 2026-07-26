@@ -93,7 +93,7 @@ impl AdapterConfig for OftConfig {
 /// `R = (I - Q) @ (I + Q)^{-1}` where Q is skew-symmetric.
 pub struct OftLayer {
     /// Skew-symmetric parameters for Cayley parameterization.
-    /// Shape: [`num_blocks`, `block_size`, `block_size`]
+    /// Shape: `[num_blocks, block_size, block_size]`
     oft_r: Tensor,
     /// Configuration
     config: OftConfig,

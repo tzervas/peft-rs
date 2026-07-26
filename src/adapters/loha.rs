@@ -69,17 +69,17 @@ impl AdapterConfig for LoHaConfig {
 /// Computes: `ΔW = (A1 @ B1) ⊙ (A2 @ B2) * scaling`
 ///
 /// Where:
-/// - A1, A2: [out_features, r]
-/// - B1, B2: [r, in_features]
+/// - A1, A2: `[out_features, r]`
+/// - B1, B2: `[r, in_features]`
 /// - ⊙ is element-wise (Hadamard) product
 pub struct LoHaLayer {
-    /// First decomposition: A1 [out_features, r]
+    /// First decomposition: A1 `[out_features, r]`
     hada_w1_a: Tensor,
-    /// First decomposition: B1 [r, in_features]
+    /// First decomposition: B1 `[r, in_features]`
     hada_w1_b: Tensor,
-    /// Second decomposition: A2 [out_features, r]
+    /// Second decomposition: A2 `[out_features, r]`
     hada_w2_a: Tensor,
-    /// Second decomposition: B2 [r, in_features]
+    /// Second decomposition: B2 `[r, in_features]`
     hada_w2_b: Tensor,
     /// Scaling factor = alpha / r
     scaling: f64,
