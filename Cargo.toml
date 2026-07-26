@@ -57,6 +57,7 @@ opt-level = 0
 debug = false
 codegen-units = 1
 incremental = false
+panic = "abort"
 
 [profile.dev.build-override]
 opt-level = 0
@@ -68,6 +69,7 @@ opt-level = 0
 debug = false
 codegen-units = 1
 incremental = false
+panic = "abort"
 
 [profile.test.build-override]
 opt-level = 0
