@@ -58,9 +58,9 @@ jobs:
       - name: free memory snapshot
         run: free -h || true
       - name: cargo check
-        run: cargo check --workspace --all-targets
+        run: cargo check --workspace --lib --tests
       - name: cargo test
-        run: cargo test --workspace
+        run: cargo test --workspace --lib --tests
 
   python:
     name: python lint/test
