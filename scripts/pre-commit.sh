@@ -6,6 +6,20 @@ set -e
 
 echo "Running pre-commit quality checks..."
 
+# Add ~/.cargo/bin to PATH if not present
+if [[ ":$PATH:" != *":$HOME/.cargo/bin:"* ]]; then
+    export PATH="$HOME/.cargo/bin:$PATH"
+fi
+
+# Dynamically auto-detect whether nvcc is present in the environment
+if command -v nvcc &> /dev/null; then
+    echo "CUDA compiler (nvcc) detected. Enabling all features (including CUDA)."
+    FEATURES_ARG="--all-features"
+else
+    echo "CUDA compiler (nvcc) not detected. Running in CPU-only mode (omitting --all-features)."
+    FEATURES_ARG=""
+fi
+
 # 1. Format check
 echo "1. Checking code formatting..."
 if ! cargo fmt -- --check; then
@@ -16,7 +30,7 @@ echo "✅ Code formatting passed"
 
 # 2. Clippy check
 echo "2. Running clippy..."
-if ! cargo clippy --all-targets --all-features -- -D warnings; then
+if ! cargo clippy --all-targets $FEATURES_ARG -- -D warnings; then
     echo "❌ Clippy check failed. Fix warnings before committing."
     exit 1
 fi
@@ -24,7 +38,7 @@ echo "✅ Clippy passed"
 
 # 3. Test suite
 echo "3. Running test suite..."
-if ! cargo test --all-features; then
+if ! cargo test $FEATURES_ARG; then
     echo "❌ Tests failed. Fix failing tests before committing."
     exit 1
 fi
@@ -40,7 +54,7 @@ if command -v cargo-audit &> /dev/null; then
         echo "✅ Security audit passed"
     fi
 else
-    echo "⚠️  cargo-audit not installed. Run: cargo install cargo-audit"
+    echo "⚠️  cargo-audit not installed. Run 'bash scripts/setup-dev.sh' to install precompiled binary"
 fi
 
 echo ""

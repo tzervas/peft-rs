@@ -6,21 +6,41 @@ set -e
 echo "Setting up peft-rs development environment..."
 echo ""
 
+# Ensure ~/.cargo/bin is in PATH for the setup session
+if [[ ":$PATH:" != *":$HOME/.cargo/bin:"* ]]; then
+    export PATH="$HOME/.cargo/bin:$PATH"
+fi
+
 # Install required cargo tools
 echo "Installing cargo tools..."
 if ! command -v cargo-audit &> /dev/null; then
-    echo "  Installing cargo-audit..."
-    cargo install cargo-audit
+    echo "  Fetching precompiled statically linked musl binary of cargo-audit from GitHub..."
+    ver="0.22.2"
+    asset="cargo-audit-x86_64-unknown-linux-gnu-v${ver}.tgz"
+    url="https://github.com/rustsec/rustsec/releases/download/cargo-audit/v${ver}/${asset}"
+    mkdir -p "${HOME}/.cargo/bin"
+    tmp="$(mktemp -d)"
+    if curl -fsSL "$url" | tar -xz -C "$tmp"; then
+        bin="$(find "$tmp" -type f -name cargo-audit | head -n1)"
+        install -m 0755 "$bin" "${HOME}/.cargo/bin/cargo-audit"
+        echo "  ✅ Installed cargo-audit to ${HOME}/.cargo/bin"
+    else
+        echo "  ⚠️  Failed to fetch precompiled cargo-audit. Falling back to cargo install..."
+        cargo install cargo-audit --locked
+    fi
+    rm -rf "$tmp"
+else
+    echo "  ✅ cargo-audit is already installed"
 fi
 
 if ! command -v cargo-tarpaulin &> /dev/null; then
     echo "  Installing cargo-tarpaulin (for coverage)..."
-    cargo install cargo-tarpaulin
+    cargo install cargo-tarpaulin --locked
 fi
 
 if ! command -v cargo-outdated &> /dev/null; then
     echo "  Installing cargo-outdated..."
-    cargo install cargo-outdated
+    cargo install cargo-outdated --locked
 fi
 
 echo ""

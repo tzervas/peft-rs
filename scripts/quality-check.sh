@@ -16,6 +16,21 @@ echo "║         PEFT-RS Quality Check Suite                      ║"
 echo "╚═══════════════════════════════════════════════════════════╝"
 echo ""
 
+# Add ~/.cargo/bin to PATH if not present
+if [[ ":$PATH:" != *":$HOME/.cargo/bin:"* ]]; then
+    export PATH="$HOME/.cargo/bin:$PATH"
+fi
+
+# Dynamically auto-detect whether nvcc is present in the environment
+if command -v nvcc &> /dev/null; then
+    echo -e "${GREEN}CUDA compiler (nvcc) detected. Enabling all features (including CUDA).${NC}"
+    FEATURES_ARG="--all-features"
+else
+    echo -e "${YELLOW}CUDA compiler (nvcc) not detected. Running in CPU-only mode (omitting --all-features).${NC}"
+    FEATURES_ARG=""
+fi
+echo ""
+
 # 1. Format check
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "1. Code Formatting Check"
@@ -33,7 +48,7 @@ echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "2. Clippy Lint Check"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-if cargo clippy --all-targets --all-features -- -D warnings 2>&1 | tee /tmp/clippy-output.txt; then
+if cargo clippy --all-targets $FEATURES_ARG -- -D warnings 2>&1 | tee /tmp/clippy-output.txt; then
     echo -e "${GREEN}✅ Clippy check passed${NC}"
 else
     echo -e "${RED}❌ Clippy check failed${NC}"
@@ -47,7 +62,7 @@ echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "3. Build Check"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-if cargo build --all-features; then
+if cargo build $FEATURES_ARG; then
     echo -e "${GREEN}✅ Build check passed${NC}"
 else
     echo -e "${RED}❌ Build check failed${NC}"
@@ -59,8 +74,8 @@ echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "4. Test Suite"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-if cargo test --all-features 2>&1 | tee /tmp/test-output.txt; then
-    TESTS_PASSED=$(grep -oP '\d+(?= passed)' /tmp/test-output.txt | tail -1)
+if cargo test $FEATURES_ARG 2>&1 | tee /tmp/test-output.txt; then
+    TESTS_PASSED=$(grep -oP '\d+(?= passed)' /tmp/test-output.txt | tail -1 || echo "0")
     echo -e "${GREEN}✅ All ${TESTS_PASSED} tests passed${NC}"
 else
     echo -e "${RED}❌ Tests failed${NC}"
@@ -72,7 +87,7 @@ echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "5. Documentation Build"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-if cargo doc --no-deps --all-features --document-private-items 2>&1 | grep -i "error" > /dev/null; then
+if cargo doc --no-deps $FEATURES_ARG --document-private-items 2>&1 | grep -i "error" > /dev/null; then
     echo -e "${RED}❌ Documentation build failed${NC}"
     FAILED=1
 else
@@ -94,7 +109,7 @@ if command -v cargo-audit &> /dev/null; then
     fi
 else
     echo -e "${YELLOW}⚠️  cargo-audit not installed${NC}"
-    echo "   Install with: cargo install cargo-audit"
+    echo "   Install with: bash scripts/setup-dev.sh (downloads precompiled statically linked binary to ~/.cargo/bin)"
 fi
 echo ""
 
