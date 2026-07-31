@@ -19,7 +19,7 @@ env:
 jobs:
   fmt:
     name: Format Check
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, podman]
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -31,7 +31,7 @@ jobs:
   # Prebuilt cargo-audit only — no rustup (avoids OOM on constrained hosts).
   audit:
     name: Security Audit
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, podman]
     steps:
       - uses: actions/checkout@v4
       - name: cargo-audit (prebuilt binary)
@@ -52,7 +52,7 @@ jobs:
 
   clippy:
     name: Clippy Lint
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, podman]
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -87,7 +87,7 @@ jobs:
 
   doc:
     name: Documentation Build
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, podman]
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -102,7 +102,7 @@ jobs:
 
   benchmark:
     name: Benchmark (on performance PRs)
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, podman]
     if: contains(github.event.pull_request.labels.*.name, 'performance')
     steps:
       - uses: actions/checkout@v4
