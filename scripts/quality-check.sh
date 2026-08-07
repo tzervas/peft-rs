@@ -16,6 +16,14 @@ echo "║         PEFT-RS Quality Check Suite                      ║"
 echo "╚═══════════════════════════════════════════════════════════╝"
 echo ""
 
+# Dynamically check for nvcc to conditionalize features
+FEATURES_FLAG="--all-features"
+if ! command -v nvcc &> /dev/null; then
+    echo -e "${YELLOW}⚠️  nvcc (CUDA compiler) not found. Running in CPU-only mode (excluding CUDA feature).${NC}"
+    FEATURES_FLAG=""
+fi
+echo ""
+
 # 1. Format check
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "1. Code Formatting Check"
@@ -33,7 +41,12 @@ echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "2. Clippy Lint Check"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-if cargo clippy --all-targets --all-features -- -D warnings 2>&1 | tee /tmp/clippy-output.txt; then
+if [ -n "$FEATURES_FLAG" ]; then
+    CLIPPY_CMD="cargo clippy --all-targets $FEATURES_FLAG -- -D warnings"
+else
+    CLIPPY_CMD="cargo clippy --all-targets -- -D warnings"
+fi
+if $CLIPPY_CMD 2>&1 | tee /tmp/clippy-output.txt; then
     echo -e "${GREEN}✅ Clippy check passed${NC}"
 else
     echo -e "${RED}❌ Clippy check failed${NC}"
@@ -47,7 +60,12 @@ echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "3. Build Check"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-if cargo build --all-features; then
+if [ -n "$FEATURES_FLAG" ]; then
+    BUILD_CMD="cargo build $FEATURES_FLAG"
+else
+    BUILD_CMD="cargo build"
+fi
+if $BUILD_CMD; then
     echo -e "${GREEN}✅ Build check passed${NC}"
 else
     echo -e "${RED}❌ Build check failed${NC}"
@@ -59,7 +77,12 @@ echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "4. Test Suite"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-if cargo test --all-features 2>&1 | tee /tmp/test-output.txt; then
+if [ -n "$FEATURES_FLAG" ]; then
+    TEST_CMD="cargo test $FEATURES_FLAG"
+else
+    TEST_CMD="cargo test"
+fi
+if $TEST_CMD 2>&1 | tee /tmp/test-output.txt; then
     TESTS_PASSED=$(grep -oP '\d+(?= passed)' /tmp/test-output.txt | tail -1)
     echo -e "${GREEN}✅ All ${TESTS_PASSED} tests passed${NC}"
 else
@@ -72,7 +95,12 @@ echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "5. Documentation Build"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-if cargo doc --no-deps --all-features --document-private-items 2>&1 | grep -i "error" > /dev/null; then
+if [ -n "$FEATURES_FLAG" ]; then
+    DOC_CMD="cargo doc --no-deps $FEATURES_FLAG --document-private-items"
+else
+    DOC_CMD="cargo doc --no-deps --document-private-items"
+fi
+if $DOC_CMD 2>&1 | grep -i "error" > /dev/null; then
     echo -e "${RED}❌ Documentation build failed${NC}"
     FAILED=1
 else

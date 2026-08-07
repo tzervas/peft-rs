@@ -10,7 +10,7 @@
 //! - Provides [`PrefixTuningLayer::concat_to_kv`] to prepend prefixes to caller K/V
 //! - Does **not** inject into candle-transformers models automatically
 //! - `Adapter::forward` remains a pass-through (prefixes are consumed via
-//!   [`get_prefix_keys`] / [`get_prefix_values`] / [`concat_to_kv`])
+//!   [`PrefixTuningLayer::get_prefix_keys`] / [`PrefixTuningLayer::get_prefix_values`] / [`PrefixTuningLayer::concat_to_kv`])
 //!
 //! Reference: <https://arxiv.org/abs/2101.00190>
 
@@ -98,13 +98,13 @@ impl AdapterConfig for PrefixTuningConfig {
 
 /// Optional two-layer MLP that maps prefix embeddings → K/V.
 struct ReparamMlp {
-    /// W1: [`prefix_dim`, hidden]
+    /// W1: `[prefix_dim, hidden]`
     w1: Tensor,
-    /// b1: [hidden]
+    /// b1: `[hidden]`
     b1: Tensor,
-    /// W2: [hidden, 2 * `num_heads` * `head_dim`]
+    /// W2: `[hidden, 2 * num_heads * head_dim]`
     w2: Tensor,
-    /// b2: [2 * `num_heads` * `head_dim`]
+    /// b2: `[2 * num_heads * head_dim]`
     b2: Tensor,
 }
 
@@ -112,13 +112,13 @@ struct ReparamMlp {
 ///
 /// Stores trainable prefix parameters and materializes per-layer K/V prefixes.
 pub struct PrefixTuningLayer {
-    /// When reparam: raw embeddings [`num_layers`, `num_prefix_tokens`, `prefix_dim`].
+    /// When reparam: raw embeddings `[num_layers, num_prefix_tokens, prefix_dim]`.
     /// When direct: unused (None).
     prefix_tokens: Option<Tensor>,
     /// Reparameterization MLP (when enabled).
     reparam: Option<ReparamMlp>,
     /// Direct prefix keys (when reparam disabled):
-    /// [`num_layers`, `num_prefix_tokens`, `num_heads`, `head_dim`]
+    /// `[num_layers, num_prefix_tokens, num_heads, head_dim]`
     prefix_keys: Option<Tensor>,
     /// Direct prefix values (when reparam disabled).
     prefix_values: Option<Tensor>,
