@@ -444,7 +444,7 @@ impl Trainable for LoraLayer {
 pub struct DoraLayer {
     /// The underlying LoRA layer
     lora: LoraLayer,
-    /// Magnitude vector: [out_features]
+    /// Magnitude vector: `[out_features]`
     magnitude: Tensor,
     /// Base weight reference (for computing norms)
     base_weight: Option<Tensor>,

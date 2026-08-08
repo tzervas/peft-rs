@@ -11,6 +11,13 @@ NC='\033[0m' # No Color
 
 FAILED=0
 
+# Detect if nvcc is present and working
+FEATURES_ARG="--all-features"
+if ! command -v nvcc &> /dev/null || ! nvcc --version &> /dev/null; then
+    echo -e "${YELLOW}⚠️  nvcc not found or not functional. Disabling --all-features to avoid build failures.${NC}"
+    FEATURES_ARG=""
+fi
+
 echo "╔═══════════════════════════════════════════════════════════╗"
 echo "║         PEFT-RS Quality Check Suite                      ║"
 echo "╚═══════════════════════════════════════════════════════════╝"
@@ -33,7 +40,7 @@ echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "2. Clippy Lint Check"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-if cargo clippy --all-targets --all-features -- -D warnings 2>&1 | tee /tmp/clippy-output.txt; then
+if cargo clippy --all-targets $FEATURES_ARG -- -D warnings 2>&1 | tee /tmp/clippy-output.txt; then
     echo -e "${GREEN}✅ Clippy check passed${NC}"
 else
     echo -e "${RED}❌ Clippy check failed${NC}"
@@ -47,7 +54,7 @@ echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "3. Build Check"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-if cargo build --all-features; then
+if cargo build $FEATURES_ARG; then
     echo -e "${GREEN}✅ Build check passed${NC}"
 else
     echo -e "${RED}❌ Build check failed${NC}"
@@ -59,7 +66,7 @@ echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "4. Test Suite"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-if cargo test --all-features 2>&1 | tee /tmp/test-output.txt; then
+if cargo test $FEATURES_ARG 2>&1 | tee /tmp/test-output.txt; then
     TESTS_PASSED=$(grep -oP '\d+(?= passed)' /tmp/test-output.txt | tail -1)
     echo -e "${GREEN}✅ All ${TESTS_PASSED} tests passed${NC}"
 else
@@ -72,7 +79,7 @@ echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "5. Documentation Build"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-if cargo doc --no-deps --all-features --document-private-items 2>&1 | grep -i "error" > /dev/null; then
+if cargo doc --no-deps $FEATURES_ARG --document-private-items 2>&1 | grep -i "error" > /dev/null; then
     echo -e "${RED}❌ Documentation build failed${NC}"
     FAILED=1
 else

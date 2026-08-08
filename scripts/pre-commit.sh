@@ -4,6 +4,13 @@
 
 set -e
 
+# Detect if nvcc is present and working
+FEATURES_ARG="--all-features"
+if ! command -v nvcc &> /dev/null || ! nvcc --version &> /dev/null; then
+    echo "⚠️  nvcc not found or not functional. Disabling --all-features to avoid build failures."
+    FEATURES_ARG=""
+fi
+
 echo "Running pre-commit quality checks..."
 
 # 1. Format check
@@ -16,7 +23,7 @@ echo "✅ Code formatting passed"
 
 # 2. Clippy check
 echo "2. Running clippy..."
-if ! cargo clippy --all-targets --all-features -- -D warnings; then
+if ! cargo clippy --all-targets $FEATURES_ARG -- -D warnings; then
     echo "❌ Clippy check failed. Fix warnings before committing."
     exit 1
 fi
@@ -24,7 +31,7 @@ echo "✅ Clippy passed"
 
 # 3. Test suite
 echo "3. Running test suite..."
-if ! cargo test --all-features; then
+if ! cargo test $FEATURES_ARG; then
     echo "❌ Tests failed. Fix failing tests before committing."
     exit 1
 fi
