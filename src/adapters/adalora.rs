@@ -148,17 +148,17 @@ impl AdapterConfig for AdaLoraConfig {
 /// AdaLoRA layer using SVD-based parameterization.
 ///
 /// Uses `W = W0 + P * Λ * Q` where:
-/// - P: Left singular vectors (out_features × r)
-/// - Λ: Diagonal singular values (r)
-/// - Q: Right singular vectors (r × in_features)
+/// - P: Left singular vectors (`out_features` × `r`)
+/// - Λ: Diagonal singular values (`r`)
+/// - Q: Right singular vectors (`r` × `in_features`)
 ///
 /// This allows for dynamic rank allocation by zeroing out singular values.
 pub struct AdaLoraLayer {
-    /// Left singular vectors: [out_features, init_r]
+    /// Left singular vectors: `[out_features, init_r]`
     lora_a: Tensor,
-    /// Singular values: [init_r]
+    /// Singular values: `[init_r]`
     lora_e: Tensor,
-    /// Right singular vectors: [init_r, in_features]
+    /// Right singular vectors: `[init_r, in_features]`
     lora_b: Tensor,
     /// Scaling factor
     scaling: f64,
