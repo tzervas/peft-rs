@@ -6,6 +6,19 @@ set -e
 
 echo "Running pre-commit quality checks..."
 
+HAS_CUDA=0
+if command -v nvcc &> /dev/null; then
+    HAS_CUDA=1
+fi
+
+FEATURES_FLAG=""
+if [ $HAS_CUDA -eq 1 ]; then
+    FEATURES_FLAG="--all-features"
+    echo "CUDA/NVCC detected. Running with --all-features."
+else
+    echo "No CUDA/NVCC detected. Running without --all-features (CPU-only)."
+fi
+
 # 1. Format check
 echo "1. Checking code formatting..."
 if ! cargo fmt -- --check; then
@@ -16,7 +29,7 @@ echo "✅ Code formatting passed"
 
 # 2. Clippy check
 echo "2. Running clippy..."
-if ! cargo clippy --all-targets --all-features -- -D warnings; then
+if ! cargo clippy --all-targets $FEATURES_FLAG -- -D warnings; then
     echo "❌ Clippy check failed. Fix warnings before committing."
     exit 1
 fi
@@ -24,7 +37,7 @@ echo "✅ Clippy passed"
 
 # 3. Test suite
 echo "3. Running test suite..."
-if ! cargo test --all-features; then
+if ! cargo test $FEATURES_FLAG; then
     echo "❌ Tests failed. Fix failing tests before committing."
     exit 1
 fi
