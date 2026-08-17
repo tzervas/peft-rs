@@ -68,6 +68,7 @@ pub mod quant;
 pub mod registry;
 pub mod training;
 pub mod traits;
+pub mod unsloth_hook;
 
 // NOTE (PR-021): `kernels` is intentionally NOT a public module.
 // Fused CubeCL sources are quarantined under `src/kernels/archive/` and are not
@@ -108,3 +109,4 @@ pub use training::{
     AdapterTrainingConfig, AdapterTrainingState, LrSchedule, TrainStepResult,
 };
 pub use traits::{Adapter, AdapterConfig, Mergeable, Trainable};
+pub use unsloth_hook::{should_dispatch_unsloth_lora, unsloth_feature_enabled};
