@@ -1,115 +1,27 @@
-name: CI
+# SPDX-License-Identifier: MIT
+# Copyright 2026 Tyler Zervas
+#
+# RETIRED — do not expand.
+# All required gates are now in fleet-ci.yml + fleet-security.yml
+# (self-hosted, HONEST_CI, DYNAMIC_POOL tiers).
+# This file remains only for manual re-runs / historical context.
+# See: gha-runner-ctl docs/FLEET_STANDARDS.md + HONEST_CI.md
+
+name: CI (legacy — retired)
 
 on:
-  push:
-    branches: [ main, dev, testing ]
-  pull_request:
-    branches: [ main, dev, testing ]
-
-concurrency:
-  group: peft-rs-ci-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
-  CARGO_INCREMENTAL: "0"
-  CARGO_PROFILE_DEV_DEBUG: "0"
 
 jobs:
-  fmt:
-    name: Format Check
-    runs-on: ubuntu-latest
+  notice:
+    name: legacy CI retired
+    runs-on: [self-hosted, linux, x64, podman]
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt
-      - name: Check formatting
-        run: cargo fmt --all -- --check
-
-  # Prebuilt cargo-audit only — no rustup (avoids OOM on constrained hosts).
-  audit:
-    name: Security Audit
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: cargo-audit (prebuilt binary)
-        run: |
-          set -euo pipefail
-          ver="0.22.2"
-          asset="cargo-audit-x86_64-unknown-linux-gnu-v${ver}.tgz"
-          url="https://github.com/rustsec/rustsec/releases/download/cargo-audit/v${ver}/${asset}"
-          mkdir -p "${HOME}/.cargo/bin"
-          tmp="$(mktemp -d)"
-          curl -fsSL "$url" | tar -xz -C "$tmp"
-          bin="$(find "$tmp" -type f -name cargo-audit | head -n1)"
-          install -m 0755 "$bin" "${HOME}/.cargo/bin/cargo-audit"
-          rm -rf "$tmp"
-          export PATH="${HOME}/.cargo/bin:${PATH}"
-          cargo-audit --version
-          cargo-audit audit
-
-  clippy:
-    name: Clippy Lint
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy
-      - name: Cache cargo
-        uses: Swatinem/rust-cache@v2
-      - name: Run clippy
-        run: cargo clippy --all-targets -- -D warnings
-
-  test:
-    name: Test Suite
-    # GitHub-hosted runners: self-hosted fleet hosts OOM (SIGKILL) compiling
-    # candle-core/pulp even with CARGO_BUILD_JOBS=1. Product gate must be reliable.
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest]
-        rust: [stable, nightly]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: ${{ matrix.rust }}
-      - name: Cache cargo
-        uses: Swatinem/rust-cache@v2
-        with:
-          key: test-${{ matrix.rust }}
-      - name: Run tests
-        run: cargo test --verbose
-
-  doc:
-    name: Documentation Build
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - name: Cache cargo
-        uses: Swatinem/rust-cache@v2
-        with:
-          key: doc
-      - name: Build documentation
-        run: cargo doc --no-deps --document-private-items
-      - name: Check for broken links
-        run: cargo doc --no-deps
-
-  benchmark:
-    name: Benchmark (on performance PRs)
-    runs-on: ubuntu-latest
-    if: contains(github.event.pull_request.labels.*.name, 'performance')
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - name: Cache cargo
-        uses: Swatinem/rust-cache@v2
-        with:
-          key: bench
-      - name: Run benchmarks
-        run: cargo bench
+      - run: |
+          echo "Legacy multi-job CI is retired."
+          echo "Use fleet-ci.yml (cargo check/test on large) and fleet-security.yml."
+          echo "HONEST_CI class=SKIP_STUB detail=legacy_ci_retired"
