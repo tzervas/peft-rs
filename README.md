@@ -56,7 +56,7 @@ Legend: **done** = usable · **partial** = real code but incomplete vs HF · **m
 | rsLoRA scaling | **done** | `use_rslora` → `α/√r` |
 | LoRA dropout | **done** | Applied when unfrozen and `dropout > 0` |
 | HF `adapter_config.json` | **done** (LoRA core) | `peft_type`, `r`, `lora_alpha`, `target_modules`, optional base/task |
-| HF LoRA weight keys | **done** | Use **`save_pretrained_hf`**. `save_pretrained` writes PEFT *filenames* with **native** keys (not Hub-safe) |
+| HF LoRA weight keys | **done** | Use **`save_pretrained_hf`** (one Linear) or **`save_multi_module_pretrained_hf`** (all target modules, one file). `save_pretrained` writes PEFT *filenames* with **native** keys (not Hub-safe) |
 | `LinearWithLora` inject | **done** | Base Linear + LoRA residual; base frozen if only adapter Vars optimized |
 | `get_peft_model` | **done** (Linear path) | Builds wrappers for pattern-matched modules; legacy registry → `get_peft_model_registry` |
 | LoRA parity fixtures | **done** | `tests/parity` allclose atol/rtol `1e-5` |
@@ -160,19 +160,21 @@ fn main() -> anyhow::Result<()> {
 
 ## Saving and Loading Adapters
 
-**Use `save_pretrained_hf` for HuggingFace PEFT / mistral.rs.**  
+**Use `save_multi_module_pretrained_hf` for a Hub-shaped PEFT directory** (all target
+modules, one safetensors). Use `save_pretrained_hf` for a single Linear.
 `save_pretrained` writes the PEFT *filenames* (`adapter_model.safetensors` + `adapter_config.json`)
 with **native** keys (`lora_a.weight`). Those files will **not** load in Python PEFT or mistral.rs.
 
 | API | Filenames | Tensor keys | Loadable by |
 |-----|-----------|-------------|-------------|
-| `save_pretrained_hf` | `adapter_model.safetensors`, `adapter_config.json` | `lora_A.{adapter}.weight` / `lora_B.{adapter}.weight` (+ optional module prefix) | peft-rs, intended for HF PEFT / mistral.rs (**unverified** vs those runtimes) |
+| `save_multi_module_pretrained_hf` | `adapter_model.safetensors`, `adapter_config.json` | `{base_model.model}.{module}.lora_A.default.weight` / `lora_B.default.weight` (all modules, one file) | peft-rs; intended for HF PEFT / vLLM LoRA / Ollama ADAPTER / mistral.rs (**unverified** vs those runtimes) |
+| `save_pretrained_hf` | same filenames | `lora_A.{adapter}.weight` / `lora_B.{adapter}.weight` (+ optional module prefix); **one Linear** | peft-rs; same intended runtimes (**unverified**) |
 | `save_pretrained` | same filenames | native `lora_a.weight` / `lora_b.weight` | **peft-rs only** |
 | `save_adapter_weights` | caller path | native keys | peft-rs only |
 
 A/B shapes match HF Linear LoRA: **A `[r, in]`**, **B `[out, r]`**.
-Prefix is the caller's job (Llama typically wants `base_model.model.model.layers.{i}.self_attn.q_proj`).
-One `LoraLayer` is one Linear; pack all target modules into one safetensors for a real adapter dir.
+Llama-family prefixes are applied by `save_multi_module_pretrained_hf` (`base_model.model.`).
+One `LoraLayer` is one Linear.
 
 ### Native keys (default `SaveLoad`)
 
