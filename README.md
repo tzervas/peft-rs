@@ -5,21 +5,26 @@
 [![Security](https://github.com/tzervas/peft-rs/actions/workflows/fleet-security.yml/badge.svg?branch=main)](https://github.com/tzervas/peft-rs/actions/workflows/fleet-security.yml?query=branch%3Amain)
 <!-- FLEET-BADGES:END -->
 
-Candle PEFT **adapter layer library** for Rust.
+Candle PEFT **adapter layer math** for Rust (LoRA / DoRA / …). **Not** a HuggingFace PEFT port.
 
 [![Crates.io](https://img.shields.io/crates/v/peft-rs.svg)](https://crates.io/crates/peft-rs)
 [![Documentation](https://docs.rs/peft-rs/badge.svg)](https://docs.rs/peft-rs)
 [![License](https://img.shields.io/crates/l/peft-rs.svg)](LICENSE)
 
 > **Honest product class:** modular PEFT *layer math* on
-> [candle](https://github.com/huggingface/candle) (forward / merge / safetensors)
+> [candle](https://github.com/huggingface/candle) **0.11** (forward / merge / safetensors)
 > plus a **Linear inject path** (`LinearWithLora` / `get_peft_model`).
 > This is **not** a drop-in HuggingFace PEFT framework and does **not** claim full
-> Python parity for every tuner.
+> Python parity, Hub round-trip goldens, or wall-time wins vs `peft`.
+>
+> **Publish skew:** crates.io is still **1.0.3** (Candle 0.9 era). This tree is **1.2.0**
+> (Candle 0.11). `v1.1.0` exists as a GitHub tag only (Candle 0.9) and was never
+> published to crates.io.
 >
 > **Docs:** [METRICS.md](METRICS.md) · [roadmap.md](roadmap.md) · [CHANGELOG.md](CHANGELOG.md) ·
 > [docs/TASK_TRACKER.md](docs/TASK_TRACKER.md) · [docs/GAP_ANALYSIS.md](docs/GAP_ANALYSIS.md) ·
-> [docs/DEPENDENCIES.md](docs/DEPENDENCIES.md) (no circular deps)
+> [docs/DEPENDENCIES.md](docs/DEPENDENCIES.md)
+
 ## What this crate is
 
 - Standalone adapter **layers** (LoRA, DoRA, AdaLoRA, IA³, LoHa, LoKr, OFT, BOFT, VeRA, prefix/prompt tuning)
@@ -39,6 +44,7 @@ Candle PEFT **adapter layer library** for Rust.
 | Full PeftTrainer / dataset loop | Thin `train_step_mse` helper; full loops are caller's (see example) |
 | Fused CUDA kernels (CubeCL) | **Quarantined** under `src/kernels/archive/` (PR-021) |
 | Full multi-tuner HF parity | LoRA is the product interop surface |
+| Proven Hub / mistral.rs load of a full Llama adapter | Self-roundtrip only; no cross-runtime golden yet |
 
 ## Status matrix (honest)
 
@@ -50,12 +56,12 @@ Legend: **done** = usable · **partial** = real code but incomplete vs HF · **m
 | rsLoRA scaling | **done** | `use_rslora` → `α/√r` |
 | LoRA dropout | **done** | Applied when unfrozen and `dropout > 0` |
 | HF `adapter_config.json` | **done** (LoRA core) | `peft_type`, `r`, `lora_alpha`, `target_modules`, optional base/task |
-| HF LoRA weight keys | **done** | `lora_A/B.default.weight` + module / `base_model.model` prefixes; native keys still default on save |
+| HF LoRA weight keys | **done** | Use **`save_pretrained_hf`**. `save_pretrained` writes PEFT *filenames* with **native** keys (not Hub-safe) |
 | `LinearWithLora` inject | **done** | Base Linear + LoRA residual; base frozen if only adapter Vars optimized |
 | `get_peft_model` | **done** (Linear path) | Builds wrappers for pattern-matched modules; legacy registry → `get_peft_model_registry` |
 | LoRA parity fixtures | **done** | `tests/parity` allclose atol/rtol `1e-5` |
 | `modules_to_save` | **non-goal / config-only** | Serialized on HF config; not auto-trained |
-| DoRA | **partial** | Magnitude/direction; SaveLoad supported |
+| DoRA | **partial** | Magnitude/direction; SaveLoad supported (key `magnitude`, not HF `lora_magnitude_vector`) |
 | LoftQ init | **stub / simplified** | Dual-Gaussian; not full SVD+quant LoftQ |
 | AdaLoRA | **partial** | SVD param + **top-k** rank mask + cubic budget schedule; no HF key suite |
 | IA³ / LoHa / LoKr / OFT / BOFT / VeRA | **partial** | Layer math; no HF key suite |
@@ -68,6 +74,7 @@ Legend: **done** = usable · **partial** = real code but incomplete vs HF · **m
 | CUDA (candle) | **partial** | Feature enables candle CUDA device path only |
 | Fused GPU kernels | **missing (quarantined)** | Archive only |
 | Full QLoRA / HF trainer | **missing** | Codecs + full trainer remain non-goals |
+| Python peft / mistral.rs roundtrip | **missing** | peft-rs → peft-rs only |
 
 Showcase: LoRA **correctness** goldens are green; CPU wall-time baselines in METRICS.md (not yet vs HF peft).
 
@@ -75,7 +82,7 @@ Showcase: LoRA **correctness** goldens are green; CPU wall-time baselines in MET
 
 | Feature | Default | Effect |
 |---------|---------|--------|
-| *(none)* | yes | CPU-friendly candle build; all layer math on host |
+| *(none)* | yes | CPU-friendly candle **0.11** build; all layer math on host |
 | `cuda` | no | Enables **`candle-core/cuda`** only — use `Device::cuda_if_available` |
 
 There is **no** `cubecl` feature on this tree. Historical fused-kernel sources live in
@@ -83,15 +90,21 @@ There is **no** `cubecl` feature on this tree. Historical fused-kernel sources l
 
 ```toml
 [dependencies]
-peft-rs = "1.1.0"
+peft-rs = "1.2.0"
 
 # Optional: candle CUDA device support (not peft fused kernels)
-peft-rs = { version = "1.1.0", features = ["cuda"] }
+peft-rs = { version = "1.2.0", features = ["cuda"] }
 ```
 
 ## Installation
 
-Add to your `Cargo.toml` as above. MSRV: Rust **1.92**.
+Add to your `Cargo.toml` as above. MSRV: Rust **1.92**. Requires **candle-core / candle-nn 0.11**.
+
+Until 1.2.0 is on crates.io, depend on git:
+
+```toml
+peft-rs = { git = "https://github.com/tzervas/peft-rs", tag = "v1.2.0" }
+```
 
 ## Quick Start
 
@@ -152,6 +165,20 @@ fn main() -> anyhow::Result<()> {
 ```
 
 ## Saving and Loading Adapters
+
+**Use `save_pretrained_hf` for HuggingFace PEFT / mistral.rs.**  
+`save_pretrained` writes the PEFT *filenames* (`adapter_model.safetensors` + `adapter_config.json`)
+with **native** keys (`lora_a.weight`). Those files will **not** load in Python PEFT or mistral.rs.
+
+| API | Filenames | Tensor keys | Loadable by |
+|-----|-----------|-------------|-------------|
+| `save_pretrained_hf` | `adapter_model.safetensors`, `adapter_config.json` | `lora_A.{adapter}.weight` / `lora_B.{adapter}.weight` (+ optional module prefix) | peft-rs, intended for HF PEFT / mistral.rs (**unverified** vs those runtimes) |
+| `save_pretrained` | same filenames | native `lora_a.weight` / `lora_b.weight` | **peft-rs only** |
+| `save_adapter_weights` | caller path | native keys | peft-rs only |
+
+A/B shapes match HF Linear LoRA: **A `[r, in]`**, **B `[out, r]`**.
+Prefix is the caller's job (Llama typically wants `base_model.model.model.layers.{i}.self_attn.q_proj`).
+One `LoraLayer` is one Linear; pack all target modules into one safetensors for a real adapter dir.
 
 ### Native keys (default `SaveLoad`)
 
@@ -271,21 +298,22 @@ This table is **not** a claim of full feature parity. Prefer the status matrix a
 
 | Capability | peft-rs (honest) | HuggingFace PEFT |
 |------------|------------------|------------------|
-| LoRA layer math | Partial (usable) | Full framework |
-| Other tuners | Partial linear layers | Broad model integration |
-| Base-model inject | Stub | Yes |
-| HF checkpoint interop | Partial / planned | Native |
-| QLoRA | No (this crate) | Yes |
-| Trainer | Schedulers only | Yes |
+| LoRA Linear math | **done** (goldens 1e-5) | Full framework |
+| Other tuners | Partial layer math | Broad model integration |
+| Base-model inject | Linear only (`get_peft_model`) | Yes (many module types) |
+| HF adapter files | LoRA keys via `save_pretrained_hf`; no Hub golden | Native |
+| QLoRA codecs | No (traits only; see qlora-rs) | Yes (with bitsandbytes) |
+| Trainer | `train_step_*` helper only | Yes |
 | Fused CUDA kernels | Quarantined / none active | Ecosystem CUDA |
 | No Python runtime | Yes | No |
 
 ## Metrics & roadmap
 
-- [METRICS.md](METRICS.md) — comparison plan vs HuggingFace peft (**not yet measured**)
+- [METRICS.md](METRICS.md) — CPU LoRA wall-time **baselines**; vs HuggingFace peft **not measured**
 - [roadmap.md](roadmap.md) — remaining work; success criteria **not** “already met”
 - [DECISION.md](DECISION.md) — SoT vs crates.io 1.0.3 skew heal
-- [docs/GAP_ANALYSIS.md](docs/GAP_ANALYSIS.md) — historical gap notes (may lag; prefer this README + METRICS)
+- [docs/GAP_ANALYSIS.md](docs/GAP_ANALYSIS.md) — gaps vs Python PEFT
+- [docs/archive/](docs/archive/) — stale 0.3/0.4 plans; **not** current claims
 
 ## Contributing
 
@@ -293,6 +321,7 @@ Contributions welcome. Prefer honesty over vanity claims. Run:
 
 ```bash
 cargo test --lib
+cargo test --tests
 ```
 
 ## License

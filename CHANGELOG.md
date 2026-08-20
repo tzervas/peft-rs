@@ -7,11 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-08-20
+
+Candle types appear in the public API (`Tensor`, `Linear`, `VarBuilder`, `Device`),
+so a candle minor bump is a **breaking change for downstream**. Version jumps
+1.1.0 → 1.2.0. Tag `v1.1.0` remains GitHub-only (Candle 0.9, never crates.io).
+
+### Changed
+- **candle-core / candle-nn `0.9` → `0.11`** (latest stable as of 2026-06-26).
+  `Linear::new` / `weight` / `bias`, `VarBuilder::from_varmap`, `AdamW`,
+  `Module::forward`, and safetensors save/load required **no source changes**.
+  Verified: `cargo test --lib` 155 passed; `cargo test --tests` (hf_roundtrip,
+  inject_train, parity_lora) passed on CPU.
+- Package version **1.2.0**.
+
 ### Documentation
-- Refreshed `docs/TASK_TRACKER.md` and `docs/GAP_ANALYSIS.md` for **1.1.0** truth (no stale “stub inject” rows).
-- Added `docs/DEPENDENCIES.md` (foundation crate; no sister deps; no cycles).
+- README: product class, publish skew (crates.io 1.0.3 vs this tree), Candle 0.11,
+  **`save_pretrained` vs `save_pretrained_hf` trap** (native keys under PEFT filenames
+  are not Hub/mistral.rs-safe), no Hub roundtrip golden.
+- GitHub / crates description aligned: layer math, not a full HF PEFT port.
+- Comparison table no longer lists inject as “stub”.
+- Archived stale 0.3/0.4 plans to `docs/archive/` (`DEVELOPMENT_PLAN.md`,
+  `PLAN_SUMMARY.md`, `PR_EXAMPLE_v0.4.0.md`). Those files overstated Python
+  parity and “superior performance”; they are not SoT.
+
+### Migration
+- Depend on **candle 0.11**. Candle 0.9/0.10 types will not unify with this crate
+  (the same class of error Vox hit when mixing 0.9 peft-rs with 0.10 workspace).
+- Interop saves: call `save_pretrained_hf`, not `save_pretrained`.
 
 ## [1.1.0] - 2026-07-22
+
+GitHub tag only. Never published to crates.io. Candle **0.9**.
 
 ### Added
 - **PR-040 HF adapter I/O**
@@ -62,6 +89,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Callers of the old string-only `get_peft_model(&[&str], …)` must switch to
   `get_peft_model_registry` or the new Linear-based `get_peft_model`.
 
+### Documentation
+- Refreshed `docs/TASK_TRACKER.md` and `docs/GAP_ANALYSIS.md` for **1.1.0** truth (no stale “stub inject” rows).
+- Added `docs/DEPENDENCIES.md` (foundation crate; no sister deps; no cycles).
+
 ## [1.0.4] - 2026-07-22
 
 ### Changed
@@ -78,15 +109,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - `DECISION.md` — formal restore-vs-supersede decision for ECO-P0-03 / PEFT-P0-02.
-- `METRICS.md` — HF peft comparison scaffold (methods listed; numbers not yet measured).
-- `src/kernels/archive/README.md` — quarantine notice for historical kernel sources.
-
-### Fixed
-- Restored missing changelog sections for **1.0.2** and **1.0.3** that were dropped after the 1.0.3 publish line.
-- Corrected historical overclaims about LoftQ “100% Python PEFT parity” and incomplete DoRA SaveLoad notes (see 1.0.0 errata below).
-
-### Notes
-- Do not treat crates.io 1.0.3 as SoT for future commits; publish next from this tree as 1.0.4+.
 
 ## [1.0.3] - 2026-01-28
 
@@ -212,7 +234,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Configuration system
 - Initial documentation (README, AGENT_GUIDE, GAP_ANALYSIS, TASK_TRACKER)
 
-[Unreleased]: https://github.com/tzervas/peft-rs/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/tzervas/peft-rs/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/tzervas/peft-rs/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/tzervas/peft-rs/compare/v1.0.4...v1.1.0
 [1.0.4]: https://github.com/tzervas/peft-rs/compare/v1.0.3...v1.0.4
 [1.0.3]: https://github.com/tzervas/peft-rs/compare/v1.0.2...v1.0.3

@@ -11,6 +11,9 @@
 | **GAP_ANALYSIS.md** | Gap analysis vs HuggingFace Python PEFT | [`docs/GAP_ANALYSIS.md`](GAP_ANALYSIS.md) |
 | **AGENT_GUIDE.md** | This file - navigation and quick reference | [`docs/AGENT_GUIDE.md`](AGENT_GUIDE.md) |
 | **README.md** | User-facing documentation and examples | [`README.md`](../README.md) |
+| **archive/** | Stale 0.3/0.4 plans — **not SoT** | [`docs/archive/README.md`](archive/README.md) |
+
+
 
 ### Skill Documentation
 | Skill | Purpose | Location |
