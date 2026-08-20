@@ -747,13 +747,20 @@ mod tests {
         save_multi_module_pretrained_hf(&modules, &hf_cfg, temp.path())?;
         let tensors =
             candle_core::safetensors::load(temp.path().join(ADAPTER_WEIGHTS_FILENAME), &device)?;
-        assert!(tensors.contains_key(
-            "base_model.model.model.layers.0.self_attn.q_proj.lora_A.default.weight"
-        ));
-        assert!(tensors.contains_key(
-            "base_model.model.model.layers.0.self_attn.v_proj.lora_B.default.weight"
-        ));
+        let qa = "base_model.model.model.layers.0.self_attn.q_proj.lora_A.default.weight";
+        let qb = "base_model.model.model.layers.0.self_attn.q_proj.lora_B.default.weight";
+        let va = "base_model.model.model.layers.0.self_attn.v_proj.lora_A.default.weight";
+        let vb = "base_model.model.model.layers.0.self_attn.v_proj.lora_B.default.weight";
+        assert!(tensors.contains_key(qa));
+        assert!(tensors.contains_key(qb));
+        assert!(tensors.contains_key(va));
+        assert!(tensors.contains_key(vb));
+        assert_eq!(tensors.len(), 4);
         assert!(!tensors.contains_key("lora_a.weight"));
+        assert!(!tensors.contains_key("lora_b.weight"));
+        assert_eq!(tensors[qa].dims(), &[4, 8]);
+        assert_eq!(tensors[qb].dims(), &[8, 4]);
+        assert_eq!(tensors[qa].dtype(), DType::F32);
         let raw = fs::read_to_string(temp.path().join(ADAPTER_CONFIG_FILENAME))
             .map_err(|e| PeftError::Io(e.to_string()))?;
         assert!(raw.contains("\"peft_type\": \"LORA\""));
@@ -769,6 +776,12 @@ mod tests {
         let layer = LoraLayer::new_with_zeros(8, 8, cfg.clone(), &device)?;
         let temp = TempDir::new().map_err(|e| PeftError::Io(e.to_string()))?;
         save_pretrained(&layer, &cfg, temp.path())?;
+        let on_disk =
+            candle_core::safetensors::load(temp.path().join(ADAPTER_WEIGHTS_FILENAME), &device)?;
+        assert!(on_disk.contains_key("lora_a.weight"));
+        assert!(on_disk.contains_key("lora_b.weight"));
+        assert!(!on_disk.contains_key("lora_A.default.weight"));
+        assert!(!on_disk.keys().any(|k| k.contains("base_model.model")));
         let mut loaded = LoraLayer::new_with_zeros(8, 8, LoraConfig::default(), &device)?;
         let _: LoraConfig = load_pretrained(&mut loaded, temp.path(), &device)?;
         Ok(())

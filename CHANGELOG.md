@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `save_multi_module_pretrained_hf` packs all target modules into one Hub-safe
   PEFT dir (`lora_A.default.weight` / `lora_B.default.weight` under
   `base_model.model.{module}`). Native `save_pretrained` is unchanged.
+  Tests assert on-disk Hub vs native keys (not only round-trip load).
+  README Saving table documents the multi-module API.
 - `.cz.toml` (commitizen conventional commits, semver 1.x; no `major_version_zero`).
 
 ## [1.2.1] - 2026-08-20
