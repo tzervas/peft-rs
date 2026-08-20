@@ -1,0 +1,26 @@
+# Commitizen configuration (commitizen-tools).
+# Install: `uv tool install commitizen` or `pip install commitizen`
+# Canonical peer: tzervas/gha-runner-ctl/.cz.toml
+#
+# WHY `major_version_zero` IS DELIBERATELY ABSENT
+# -----------------------------------------------
+# This crate is published on crates.io at 1.x. `major_version_zero = true`
+# demotes BREAKING to MINOR forever. Do not add it. No agent may cut 2.0.0.
+#
+# `version` is what cz bumps *from*. Keep it lockstep with Cargo.toml.
+# Do not hand-edit version files — `cz bump` on a release branch.
+
+[tool.commitizen]
+name = "cz_conventional_commits"
+version = "1.2.1"
+tag_format = "v$version"
+version_scheme = "semver"
+
+version_files = [
+    "Cargo.toml:version",
+]
+
+# Keep a Changelog is hand-maintained. Do not pass `cz bump --changelog`.
+update_changelog_on_bump = false
+changelog_file = "CHANGELOG.md"
+changelog_incremental = true
