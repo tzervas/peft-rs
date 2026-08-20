@@ -17,9 +17,9 @@ Candle PEFT **adapter layer math** for Rust (LoRA / DoRA / …). **Not** a Huggi
 > This is **not** a drop-in HuggingFace PEFT framework and does **not** claim full
 > Python parity, Hub round-trip goldens, or wall-time wins vs `peft`.
 >
-> **Publish skew:** crates.io is still **1.0.3** (Candle 0.9 era). This tree is **1.2.0**
-> (Candle 0.11). `v1.1.0` exists as a GitHub tag only (Candle 0.9) and was never
-> published to crates.io.
+> **Publish skew:** crates.io 1.2.0 is Candle 0.11 / MSRV 1.92. This tree is **1.2.1**
+> (same API, MSRV **1.96**). `v1.1.0` exists as a GitHub tag only (Candle 0.9) and was
+> never published to crates.io.
 >
 > **Docs:** [METRICS.md](METRICS.md) · [roadmap.md](roadmap.md) · [CHANGELOG.md](CHANGELOG.md) ·
 > [docs/TASK_TRACKER.md](docs/TASK_TRACKER.md) · [docs/GAP_ANALYSIS.md](docs/GAP_ANALYSIS.md) ·
@@ -90,21 +90,15 @@ There is **no** `cubecl` feature on this tree. Historical fused-kernel sources l
 
 ```toml
 [dependencies]
-peft-rs = "1.2.0"
+peft-rs = "1.2.1"
 
 # Optional: candle CUDA device support (not peft fused kernels)
-peft-rs = { version = "1.2.0", features = ["cuda"] }
+peft-rs = { version = "1.2.1", features = ["cuda"] }
 ```
 
 ## Installation
 
-Add to your `Cargo.toml` as above. MSRV: Rust **1.92**. Requires **candle-core / candle-nn 0.11**.
-
-Until 1.2.0 is on crates.io, depend on git:
-
-```toml
-peft-rs = { git = "https://github.com/tzervas/peft-rs", tag = "v1.2.0" }
-```
+Add to your `Cargo.toml` as above. MSRV: Rust **1.96**. Requires **candle-core / candle-nn 0.11**.
 
 ## Quick Start
 
