@@ -56,7 +56,7 @@ Legend: **done** = usable · **partial** = real code but incomplete vs HF · **m
 | rsLoRA scaling | **done** | `use_rslora` → `α/√r` |
 | LoRA dropout | **done** | Applied when unfrozen and `dropout > 0` |
 | HF `adapter_config.json` | **done** (LoRA core) | `peft_type`, `r`, `lora_alpha`, `target_modules`, optional base/task |
-| HF LoRA weight keys | **done** | Use **`save_pretrained_hf`**. `save_pretrained` writes PEFT *filenames* with **native** keys (not Hub-safe) |
+| HF LoRA weight keys | **done** | Use **`save_pretrained_hf`** (one Linear) or **`save_multi_module_pretrained_hf`** (all target modules, one file). `save_pretrained` writes PEFT *filenames* with **native** keys (not Hub-safe) |
 | `LinearWithLora` inject | **done** | Base Linear + LoRA residual; base frozen if only adapter Vars optimized |
 | `get_peft_model` | **done** (Linear path) | Builds wrappers for pattern-matched modules; legacy registry → `get_peft_model_registry` |
 | LoRA parity fixtures | **done** | `tests/parity` allclose atol/rtol `1e-5` |

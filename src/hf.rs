@@ -424,6 +424,69 @@ pub fn insert_module_lora_weights(
     out.insert(style.key_b(), lora_b.clone());
 }
 
+/// Hugging Face `PeftModel` wrapper prefix applied in front of original module paths.
+///
+/// Llama-family PEFT keys look like
+/// `base_model.model.model.layers.0.self_attn.q_proj.lora_A.default.weight`
+/// when the original Linear is `model.layers.0.self_attn.q_proj`.
+pub const HF_PEFT_WRAPPER_PREFIX: &str = "base_model.model";
+
+/// Prefix a module path with [`HF_PEFT_WRAPPER_PREFIX`] unless already wrapped.
+#[must_use]
+pub fn hf_peft_module_path(module: &str) -> String {
+    if module.starts_with("base_model.model.") || module.starts_with("base_model.") {
+        module.to_string()
+    } else {
+        format!("{HF_PEFT_WRAPPER_PREFIX}.{module}")
+    }
+}
+
+/// Pack many Linear modules into one Hub-safe PEFT directory.
+///
+/// Each map entry is `original_module_path → (lora_A [r, in], lora_B [out, r])`.
+/// Keys are written as `{HF_PEFT_WRAPPER_PREFIX}.{module}.lora_A.default.weight`
+/// (unless `module` is already wrapped).
+///
+/// Native [`crate::io::save_pretrained`] is unchanged (peft-rs-only keys).
+///
+/// # Errors
+/// Returns I/O, validation, or serialization errors.
+pub fn save_multi_module_pretrained_hf<P: AsRef<Path>>(
+    modules: &HashMap<String, (Tensor, Tensor)>,
+    hf_config: &HfLoraConfig,
+    dir: P,
+) -> Result<()> {
+    hf_config.validate()?;
+    if modules.is_empty() {
+        return Err(PeftError::InvalidConfig(
+            "save_multi_module_pretrained_hf: no modules".into(),
+        ));
+    }
+    let dir = dir.as_ref();
+    if !dir.exists() {
+        fs::create_dir_all(dir)
+            .map_err(|e| PeftError::Io(format!("Failed to create directory: {e}")))?;
+    }
+
+    let mut hf_dict = HashMap::new();
+    for (module, (a, b)) in modules {
+        insert_module_lora_weights(
+            &mut hf_dict,
+            &hf_peft_module_path(module),
+            a,
+            b,
+            DEFAULT_ADAPTER_NAME,
+        );
+    }
+    let weights_path = dir.join(ADAPTER_WEIGHTS_FILENAME);
+    candle_core::safetensors::save(&hf_dict, &weights_path)
+        .map_err(|e| PeftError::Io(format!("Failed to save safetensors: {e}")))?;
+
+    let config_path = dir.join(ADAPTER_CONFIG_FILENAME);
+    save_adapter_config(hf_config, &config_path)?;
+    Ok(())
+}
+
 /// Save adapter weights using an explicit key style plus HF `adapter_config.json`.
 ///
 /// # Errors
@@ -660,6 +723,41 @@ mod tests {
             .max(0)?
             .to_scalar::<f32>()?;
         assert!(max_diff < 1e-5, "max_diff={max_diff}");
+        Ok(())
+    }
+
+    #[test]
+    fn test_save_multi_module_pretrained_hf_keys() -> Result<()> {
+        let device = Device::Cpu;
+        let a = Tensor::ones((4, 8), DType::F32, &device)?;
+        let b = Tensor::ones((8, 4), DType::F32, &device)?;
+        let mut modules = HashMap::new();
+        modules.insert(
+            "model.layers.0.self_attn.q_proj".into(),
+            (a.clone(), b.clone()),
+        );
+        modules.insert("model.layers.0.self_attn.v_proj".into(), (a, b));
+        let hf_cfg = HfLoraConfig {
+            r: 4,
+            lora_alpha: 8,
+            target_modules: vec!["q_proj".into(), "v_proj".into()],
+            ..Default::default()
+        };
+        let temp = TempDir::new().map_err(|e| PeftError::Io(e.to_string()))?;
+        save_multi_module_pretrained_hf(&modules, &hf_cfg, temp.path())?;
+        let tensors =
+            candle_core::safetensors::load(temp.path().join(ADAPTER_WEIGHTS_FILENAME), &device)?;
+        assert!(tensors.contains_key(
+            "base_model.model.model.layers.0.self_attn.q_proj.lora_A.default.weight"
+        ));
+        assert!(tensors.contains_key(
+            "base_model.model.model.layers.0.self_attn.v_proj.lora_B.default.weight"
+        ));
+        assert!(!tensors.contains_key("lora_a.weight"));
+        let raw = fs::read_to_string(temp.path().join(ADAPTER_CONFIG_FILENAME))
+            .map_err(|e| PeftError::Io(e.to_string()))?;
+        assert!(raw.contains("\"peft_type\": \"LORA\""));
+        assert!(raw.contains("lora_alpha"));
         Ok(())
     }
 
