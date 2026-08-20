@@ -1,8 +1,8 @@
 [package]
 name = "peft-rs"
-version = "1.2.0"
+version = "1.2.1"
 edition = "2021"
-rust-version = "1.92"
+rust-version = "1.96"
 license = "MIT"
 description = "Candle PEFT adapter layer math (LoRA/DoRA/…) for Rust — not a full HF PEFT port"
 authors = ["Tyler Zervas <tz-dev@vectorweight.com>"]

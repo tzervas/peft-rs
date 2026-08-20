@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-08-20
+
+### Changed
+- **MSRV 1.92 → 1.96.** `rust-version = "1.96"` plus `rust-toolchain.toml`
+  (`1.96.1`). Self-hosted fleet-ci/release install that toolchain so jobs do
+  not run the work image's rustc 1.88 (which cannot compile this crate or
+  several deps).
+
 ## [1.2.0] - 2026-08-20
 
 Candle types appear in the public API (`Tensor`, `Linear`, `VarBuilder`, `Device`),
