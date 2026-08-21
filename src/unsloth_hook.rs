@@ -5,7 +5,7 @@
 //!
 //! Feature `unsloth` (not default). **Does not** un-quarantine `src/kernels/archive`.
 //! peft remains adapter math. Fused `LoRA`-add is **not** dispatched (no such
-//! kernel in unsloth-rs 1.0.x).
+//! kernel in unsloth-rs).
 
 /// Feature compiled in. Does not mean a fused `LoRA` kernel exists.
 #[must_use]
@@ -15,7 +15,7 @@ pub const fn unsloth_feature_enabled() -> bool {
 
 /// Whether this crate should dispatch an unsloth kernel for `LoRA` add.
 ///
-/// Always `false` in 1.1.x — no fused `LoRA`-add `CustomOp` yet.
+/// Always `false` until a fused `LoRA`-add `CustomOp` exists in unsloth-rs.
 #[must_use]
 pub const fn should_dispatch_unsloth_lora() -> bool {
     false

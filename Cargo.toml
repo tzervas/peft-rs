@@ -18,7 +18,7 @@ serde_json = { workspace = true }
 safetensors = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
-unsloth-rs = { version = "1.0", optional = true }
+unsloth-rs = { version = "1.2", optional = true }
 
 [dev-dependencies]
 criterion = { workspace = true }
