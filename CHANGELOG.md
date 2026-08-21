@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `docs/VERSIONING.md` — live version is `Cargo.toml` / `cz version --project`,
+  not a frozen number in docs. Consumers pin `peft-rs = "1"`.
+
+### Changed
+- README install examples pin major (`"1"`), not a patch.
+- `docs/RELEASE_PROCESS.md` defers versioning to VERSIONING.md; PRs target
+  `main` (`dev` / `testing` are not the gate).
+
 ### Fixed
 - `reopen-issues-closed-off-main.yml` is valid YAML again: replace the
   column-0 `python3 <<'PY'` heredoc with `python3 -c` so GitHub stops

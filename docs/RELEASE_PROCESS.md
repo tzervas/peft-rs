@@ -1,10 +1,13 @@
 # Release Process for peft-rs
 
+Semver, commitizen, and where a version actually shipped:
+**[VERSIONING.md](VERSIONING.md)**. Live number is `Cargo.toml`, not this file.
+
 ## Publication Information
 
-**Crates.io**: Published as stable release (1.0.0)
-**Maintainer**: Tyler Zervas (tzervas)  
-**Contact**: tz-dev@vectorweight.com  
+**Crates.io**: <https://crates.io/crates/peft-rs> (registry may lag git tags)
+**Maintainer**: Tyler Zervas (tzervas)
+**Contact**: tz-dev@vectorweight.com
 **GPG Key**: Required for all releases
 
 ## Pre-Release Checklist
@@ -17,16 +20,10 @@
 - [ ] Documentation complete (`cargo doc --no-deps`)
 
 ### Version Management
-- [ ] Version bumped in `Cargo.toml`
-- [ ] `CHANGELOG.md` updated with all changes
-- [ ] Git tag created: `vX.Y.Z`
-- [ ] All changes committed to appropriate branch
-
-### Branch Workflow
-- [ ] Changes merged to `dev`
-- [ ] Integrated and tested in `testing` branch
-- [ ] Final validation in `testing`
-- [ ] Merged to `main` for release
+- [ ] Version bumped with `cz bump --files-only` (never by hand — see VERSIONING.md)
+- [ ] `CHANGELOG.md` `## [Unreleased]` moved to the new version
+- [ ] PR to **`main`** (not `dev` / `testing`)
+- [ ] Tag via `.github/workflows/release.yml` (`bump=none`) after merge
 
 ## GPG Signing Configuration
 
