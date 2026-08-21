@@ -85,6 +85,19 @@ jobs:
       - name: Run tests
         run: cargo test --verbose
 
+  unsloth-feature:
+    name: Unsloth feature
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: unsloth
+      - name: Test --features unsloth
+        run: cargo test --features unsloth --verbose
+
   doc:
     name: Documentation Build
     runs-on: ubuntu-latest

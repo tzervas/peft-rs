@@ -26,7 +26,7 @@ fn warn_cpu_fallback(device: &Device) {
     if matches!(device, Device::Cpu) {
         WARN_ONCE.call_once(|| {
             eprintln!(
-                "peft-rs: CPU device in use. CUDA is the intended default; enable the 'cuda' feature and use Device::cuda_if_available(0) when possible."
+                "peft-rs: CPU device in use. CPU is the default product path; optional `cuda` enables candle-core CUDA (no peft fused kernels)."
             );
         });
     }

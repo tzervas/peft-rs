@@ -58,6 +58,39 @@ fn linear_with_lora_forward_adds_residual() -> anyhow::Result<()> {
 }
 
 #[test]
+fn linear_with_lora_merged_weight_matches_forward() -> anyhow::Result<()> {
+    let device = Device::Cpu;
+    let base_w = Tensor::eye(4, DType::F32, &device)?;
+    let base = Linear::new(base_w, None);
+    let cfg = LoraConfig {
+        r: 2,
+        alpha: 4, // scaling = 2
+        ..Default::default()
+    };
+    let a = Tensor::ones((2, 4), DType::F32, &device)?;
+    let b = Tensor::ones((4, 2), DType::F32, &device)?;
+    let lora = peft_rs::LoraLayer::from_weights(a, b, cfg)?;
+    let layer = LinearWithLora::from_parts("fc", base, lora)?;
+
+    let x = Tensor::ones((2, 4), DType::F32, &device)?;
+    let y = layer.forward(&x)?;
+    let merged = layer.merged_weight()?;
+    assert_eq!(merged.dims(), &[4, 4]);
+    let y_merged = Linear::new(merged, None).forward(&x)?;
+    let err = y
+        .sub(&y_merged)?
+        .abs()?
+        .flatten_all()?
+        .max(0)?
+        .to_scalar::<f32>()?;
+    assert!(
+        err < 1e-5,
+        "merged dense Linear must match residual forward, err={err}"
+    );
+    Ok(())
+}
+
+#[test]
 fn get_peft_model_mlp_adamw_updates_adapters_not_base() -> anyhow::Result<()> {
     let device = Device::Cpu;
 
