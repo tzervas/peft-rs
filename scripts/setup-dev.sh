@@ -25,13 +25,7 @@ fi
 
 echo ""
 echo "Setting up git hooks..."
-if [ -f scripts/pre-commit.sh ]; then
-    cp scripts/pre-commit.sh .git/hooks/pre-commit
-    chmod +x .git/hooks/pre-commit
-    echo "  ✅ Pre-commit hook installed"
-else
-    echo "  ⚠️  Pre-commit script not found"
-fi
+bash scripts/install-hooks.sh
 
 echo ""
 echo "Making scripts executable..."

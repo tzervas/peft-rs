@@ -11,6 +11,10 @@ fi
 
 echo "Running pre-commit quality checks..."
 
+# 0. Secrets in the index (CI is too late — rotate if this fires after a push)
+echo "0. gitleaks protect --staged..."
+bash "$(git rev-parse --show-toplevel)/scripts/gitleaks-staged.sh"
+
 # 1. Format check
 echo "1. Checking code formatting..."
 if ! cargo fmt -- --check; then
