@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   not a frozen number in docs. Consumers pin `peft-rs = "1"`.
 
 ### Changed
+- Local `scripts/quality-check.sh` / `pre-commit.sh` run `--features unsloth`
+  (and `unsloth,cuda` only if `nvcc` is on PATH). No `--all-features`.
+- `CLAUDE.md` matches the live tree (1.x / Candle 0.11 / MSRV 1.96).
+- Workspace lint `unsafe_code = forbid`.
 - CPU-device stderr no longer calls CUDA the intended default.
 - README install examples pin major (`"1"`), not a patch.
 - `docs/RELEASE_PROCESS.md` defers versioning to VERSIONING.md; PRs target
