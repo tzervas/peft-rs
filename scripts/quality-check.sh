@@ -2,7 +2,7 @@
 # Comprehensive quality check script for peft-rs
 # Run before creating PRs
 
-set -e
+set -euo pipefail
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -16,6 +16,7 @@ FEATURES=(--features unsloth)
 if command -v nvcc >/dev/null 2>&1; then
     FEATURES=(--features unsloth,cuda)
 fi
+echo "Using ${FEATURES[*]}"
 
 echo "╔═══════════════════════════════════════════════════════════╗"
 echo "║         PEFT-RS Quality Check Suite                      ║"
@@ -39,12 +40,10 @@ echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "2. Clippy Lint Check"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-if cargo clippy --all-targets "${FEATURES[@]}" -- -D warnings 2>&1 | tee /tmp/clippy-output.txt; then
+if cargo clippy --all-targets "${FEATURES[@]}" -- -D warnings; then
     echo -e "${GREEN}✅ Clippy check passed${NC}"
 else
     echo -e "${RED}❌ Clippy check failed${NC}"
-    CLIPPY_WARNINGS=$(grep -c "error:" /tmp/clippy-output.txt || echo "0")
-    echo "   Found ${CLIPPY_WARNINGS} issues"
     FAILED=1
 fi
 echo ""
@@ -65,9 +64,8 @@ echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "4. Test Suite"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-if cargo test "${FEATURES[@]}" 2>&1 | tee /tmp/test-output.txt; then
-    TESTS_PASSED=$(grep -oP '\d+(?= passed)' /tmp/test-output.txt | tail -1)
-    echo -e "${GREEN}✅ All ${TESTS_PASSED} tests passed${NC}"
+if cargo test "${FEATURES[@]}"; then
+    echo -e "${GREEN}✅ Tests passed${NC}"
 else
     echo -e "${RED}❌ Tests failed${NC}"
     FAILED=1
@@ -78,11 +76,11 @@ echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "5. Documentation Build"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-if cargo doc --no-deps "${FEATURES[@]}" --document-private-items 2>&1 | grep -i "error" > /dev/null; then
+if RUSTDOCFLAGS="-D warnings" cargo doc --no-deps "${FEATURES[@]}" --document-private-items; then
+    echo -e "${GREEN}✅ Documentation build passed${NC}"
+else
     echo -e "${RED}❌ Documentation build failed${NC}"
     FAILED=1
-else
-    echo -e "${GREEN}✅ Documentation build passed${NC}"
 fi
 echo ""
 

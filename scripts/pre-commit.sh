@@ -2,7 +2,7 @@
 # Pre-commit quality checks for peft-rs
 # Install: cp scripts/pre-commit.sh .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
 
-set -e
+set -euo pipefail
 
 FEATURES=(--features unsloth)
 if command -v nvcc >/dev/null 2>&1; then

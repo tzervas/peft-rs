@@ -18,6 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Local `scripts/quality-check.sh` / `pre-commit.sh` run `--features unsloth`
   (and `unsloth,cuda` only if `nvcc` is on PATH). No `--all-features`.
+  Docs gate uses `RUSTDOCFLAGS=-D warnings` and the cargo exit code (not
+  `grep -i error`). Scripts use `set -o pipefail`.
 - `CLAUDE.md` matches the live tree (1.x / Candle 0.11 / MSRV 1.96).
 - Workspace lint `unsafe_code = forbid`.
 - CPU-device stderr no longer calls CUDA the intended default.
