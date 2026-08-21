@@ -2,7 +2,12 @@
 # Pre-commit quality checks for peft-rs
 # Install: cp scripts/pre-commit.sh .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
 
-set -e
+set -euo pipefail
+
+FEATURES=(--features unsloth)
+if command -v nvcc >/dev/null 2>&1; then
+    FEATURES=(--features unsloth,cuda)
+fi
 
 echo "Running pre-commit quality checks..."
 
@@ -16,7 +21,7 @@ echo "✅ Code formatting passed"
 
 # 2. Clippy check
 echo "2. Running clippy..."
-if ! cargo clippy --all-targets --all-features -- -D warnings; then
+if ! cargo clippy --all-targets "${FEATURES[@]}" -- -D warnings; then
     echo "❌ Clippy check failed. Fix warnings before committing."
     exit 1
 fi
@@ -24,7 +29,7 @@ echo "✅ Clippy passed"
 
 # 3. Test suite
 echo "3. Running test suite..."
-if ! cargo test --all-features; then
+if ! cargo test "${FEATURES[@]}"; then
     echo "❌ Tests failed. Fix failing tests before committing."
     exit 1
 fi
