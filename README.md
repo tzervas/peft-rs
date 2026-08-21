@@ -91,7 +91,7 @@ peft-rs = { version = "1.1.0", features = ["cuda"] }
 
 ## Installation
 
-Add to your `Cargo.toml` as above. MSRV: Rust **1.85**.
+Add to your `Cargo.toml` as above. MSRV: Rust **1.92**.
 
 ## Quick Start
 

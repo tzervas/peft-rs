@@ -355,7 +355,7 @@ impl AdaLoraLayer {
             && step < self.config.total_step.saturating_sub(self.config.tfinal);
         if in_budget_phase
             && self.config.delta_t > 1
-            && step % self.config.delta_t != 0
+            && !step.is_multiple_of(self.config.delta_t)
             && step != self.config.tinit
         {
             return Ok(());

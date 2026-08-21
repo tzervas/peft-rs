@@ -173,7 +173,7 @@ impl BoftLayer {
         // Compute block_size and block_num based on config
         let (block_size, block_num) = if config.boft_block_size == 0 {
             // Compute block_size from block_num
-            if in_features % config.boft_block_num != 0 {
+            if !in_features.is_multiple_of(config.boft_block_num) {
                 return Err(PeftError::InvalidConfig(format!(
                     "in_features ({}) must be divisible by boft_block_num ({})",
                     in_features, config.boft_block_num
@@ -182,7 +182,7 @@ impl BoftLayer {
             (in_features / config.boft_block_num, config.boft_block_num)
         } else {
             // Compute block_num from block_size
-            if in_features % config.boft_block_size != 0 {
+            if !in_features.is_multiple_of(config.boft_block_size) {
                 return Err(PeftError::InvalidConfig(format!(
                     "in_features ({}) must be divisible by boft_block_size ({})",
                     in_features, config.boft_block_size
