@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-08-20
+
 ### Added
 - `save_multi_module_pretrained_hf` packs all target modules into one Hub-safe
   PEFT dir (`lora_A.default.weight` / `lora_B.default.weight` under
