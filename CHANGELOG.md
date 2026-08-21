@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Hosted CI job `Unsloth feature`: `cargo test --features unsloth`.
   `RmsNorm` re-export has a CPU shape test when that feature is on.
   `should_dispatch_unsloth_lora()` stays false.
+- `LinearWithLora::merged_weight` CPU test: dense Linear matches residual forward.
 - `docs/VERSIONING.md` — live version is `Cargo.toml` / `cz version --project`,
   not a frozen number in docs. Consumers pin `peft-rs = "1"`.
 
