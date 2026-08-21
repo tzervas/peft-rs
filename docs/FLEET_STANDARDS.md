@@ -25,12 +25,6 @@ README badges use GitHub Actions SVG for **trunk** branch — live status, not s
 
 Automatic Copilot code reviews are **disabled** for fleet-managed repos. Do not request Copilot on PRs.
 
-## Gitleaks / gitignore
-
-- `fleet-security.yml` **must** pass `--config .gitleaks.toml` (native, docker, and podman).
-- `.gitignore` must cover `/target/`, `.env*`, keys/PEMs, `.cargo/config.toml` (local path overrides), and `*.crate`.
-- Libraries gitignore `Cargo.lock`; the axolotl binary crate **tracks** `Cargo.lock`.
-
 ## Permissions
 
 Workflows use minimum `permissions:` blocks (contents read; issues write only for close/reopen jobs).

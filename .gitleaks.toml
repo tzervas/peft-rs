@@ -1,14 +1,14 @@
 # Gitleaks configuration
 # https://github.com/gitleaks/gitleaks
 #
-# Rule-scoped allowlists must be a TOML *table* (`[rules.allowlist]`),
+# Note: rule-scoped allowlists must be a TOML *table* (`[rules.allowlist]`),
 # not an array of tables (`[[rules.allowlist]]`). The latter decodes as a
-# slice and fails with: Rules[N].AllowList expected a map, got 'slice'.
-# Each `[rules.allowlist]` applies to the preceding `[[rules]]` entry.
+# slice and fails with: Rules[N].Allowlist expected a map, got 'slice'.
 
 title = "Gitleaks Config"
 
 [extend]
+# Use default gitleaks rules
 useDefault = true
 
 [allowlist]
@@ -17,14 +17,15 @@ paths = [
     '''(^|/)target/''',
     '''(^|/)\.git/''',
     '''Cargo\.lock$''',
+    # Test / bench / example fixtures often contain dummy secrets
     '''(^|/)tests/''',
     '''(^|/)benches/''',
     '''(^|/)examples/''',
-    '''(^|/)docs/archive/''',
-    '''(^|/)\.gitleaks\.toml$''',
 ]
 regexes = [
+    # Test fixtures with dummy values
     '''(?i)test.*=.*["'][a-z0-9]{32,}["']''',
+    # Documentation examples
     '''(?i)example.*key.*=''',
 ]
 

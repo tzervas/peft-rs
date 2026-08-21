@@ -1,12 +1,12 @@
 # PEFT-RS Task Tracker
 
-Honest implementation status for **peft-rs 1.2.0**. Prefer [README.md](../README.md)
+Honest implementation status for **peft-rs 1.1.0**. Prefer [README.md](../README.md)
 status matrix and [METRICS.md](../METRICS.md) as the user-facing source of truth.
 
 > **Product class:** Candle PEFT adapter **layer library** + Linear inject path —
-> not full HuggingFace PEFT. Candle **0.11**.
+> not full HuggingFace PEFT.
 
-## Status overview (1.2.0)
+## Status overview (1.1.0)
 
 | Feature | Status | Notes |
 |---------|--------|-------|
@@ -18,7 +18,7 @@ status matrix and [METRICS.md](../METRICS.md) as the user-facing source of truth
 | **Adapter / Mergeable / Trainable / SaveLoad** | **done** | Core traits |
 | **Trainable freeze** | **partial** | Flag + dropout gate; does not detach Vars |
 | **Weight I/O (native)** | **done** | safetensors helpers |
-| **HF adapter_config + LoRA keys** | **done** (LoRA) | `save_pretrained_hf` is the interop API |
+| **HF adapter_config + LoRA keys** | **done** (LoRA) | `hf` module; product interop surface |
 | **`LinearWithLora` / `get_peft_model`** | **done** | Real residual forward; legacy → `get_peft_model_registry` |
 | **Multi-adapter registry** | **done** | Switch + weighted residual compose |
 | **Training utilities** | **done** (minimal) | `train_step_mse` / `train_step_with_loss` — not full PeftTrainer |
@@ -26,15 +26,7 @@ status matrix and [METRICS.md](../METRICS.md) as the user-facing source of truth
 | **LoRA parity fixtures** | **done** | `tests/parity` allclose 1e-5 |
 | **Criterion benches** | **done** (LoRA) | Numbers in METRICS.md (CPU baselines) |
 | **Fused CUDA kernels** | **quarantined** | `src/kernels/archive/` — not built |
-| **Candle** | **0.11** | 1.2.0 bump; no adapter-source changes |
 | **METRICS vs Python peft** | **partial** | Correctness done; wall-time vs peft not measured |
-| **Hub / mistral.rs roundtrip** | **missing** | peft-rs self-roundtrip only |
-
-## Closed in 1.2.0
-
-- Candle 0.9 → 0.11 (tests green, no source edits)
-- Honesty: `save_pretrained` trap documented; stale 0.3/0.4 plans archived
-- Comparison table no longer lists inject as stub
 
 ## Closed in 1.1.0
 
@@ -55,7 +47,6 @@ status matrix and [METRICS.md](../METRICS.md) as the user-facing source of truth
 |-----|--------|
 | PEFT-P1-05 | Optional CubeCL kernel restore **or** leave quarantined |
 | PEFT-P1-06 | Conv2d / Embedding LoRA targets |
-| PEFT-P1-07 | Hub / Python peft / mistral.rs golden (both directions) |
 | PEFT-P2-01 | Additional tuners (p-tuning, X-LoRA, …) after core |
 | PEFT-P2-03 | Wall-time / RSS / throughput vs Python peft |
 
