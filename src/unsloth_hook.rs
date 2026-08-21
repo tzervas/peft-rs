@@ -32,4 +32,19 @@ mod tests {
         assert!(!super::should_dispatch_unsloth_lora());
         assert_eq!(super::unsloth_feature_enabled(), cfg!(feature = "unsloth"));
     }
+
+    #[cfg(feature = "unsloth")]
+    #[test]
+    fn rmsnorm_reexport_cpu_shape() {
+        use super::RmsNorm;
+        use candle_core::{Device, Tensor};
+
+        let device = Device::Cpu;
+        let layer = RmsNorm::new(32, 1e-5, &device).expect("RmsNorm");
+        let x = Tensor::randn(0f32, 1f32, (2, 8, 32), &device).unwrap();
+        let y = layer.forward(&x).expect("forward");
+        assert_eq!(y.dims(), x.dims());
+        let flat = y.flatten_all().unwrap().to_vec1::<f32>().unwrap();
+        assert!(flat.iter().all(|v| v.is_finite()));
+    }
 }

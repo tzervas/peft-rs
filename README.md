@@ -17,8 +17,7 @@ Candle PEFT **adapter layer math** for Rust (LoRA / DoRA / …). **Not** a Huggi
 > This is **not** a drop-in HuggingFace PEFT framework and does **not** claim full
 > Python parity, Hub round-trip goldens, or wall-time wins vs `peft`.
 >
-> **Publish skew:** crates.io last published **1.2.1** (Candle 0.11, MSRV **1.96**).
-> This tree is **1.3.0** (`save_multi_module_pretrained_hf`). `v1.1.0` is GitHub-only
+> **Publish skew:** live version is `Cargo.toml`. `v1.1.0` is GitHub-only
 > (Candle 0.9) and was never published to crates.io.
 >
 > **Docs:** [METRICS.md](METRICS.md) · [roadmap.md](roadmap.md) · [CHANGELOG.md](CHANGELOG.md) ·
@@ -84,6 +83,7 @@ Showcase: LoRA **correctness** goldens are green; CPU wall-time baselines in MET
 |---------|---------|--------|
 | *(none)* | yes | CPU-friendly candle **0.11** build; all layer math on host |
 | `cuda` | no | Enables **`candle-core/cuda`** only — use `Device::cuda_if_available` |
+| `unsloth` | no | Optional consume of unsloth-rs `RmsNorm` / `SwiGLU`. **Does not** un-quarantine peft kernels. `should_dispatch_unsloth_lora()` is **always false** (no fused LoRA-add CustomOp). Hosted CI job `Unsloth feature` runs this path. |
 
 There is **no** `cubecl` feature on this tree. Historical fused-kernel sources live in
 `src/kernels/archive/` and are **not** part of the build (PR-021 quarantine).
