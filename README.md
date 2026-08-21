@@ -22,8 +22,8 @@ Candle PEFT **adapter layer math** for Rust (LoRA / DoRA / …). **Not** a Huggi
 > (Candle 0.9) and was never published to crates.io.
 >
 > **Docs:** [METRICS.md](METRICS.md) · [roadmap.md](roadmap.md) · [CHANGELOG.md](CHANGELOG.md) ·
-> [docs/TASK_TRACKER.md](docs/TASK_TRACKER.md) · [docs/GAP_ANALYSIS.md](docs/GAP_ANALYSIS.md) ·
-> [docs/DEPENDENCIES.md](docs/DEPENDENCIES.md)
+> [docs/VERSIONING.md](docs/VERSIONING.md) · [docs/TASK_TRACKER.md](docs/TASK_TRACKER.md) ·
+> [docs/GAP_ANALYSIS.md](docs/GAP_ANALYSIS.md) · [docs/DEPENDENCIES.md](docs/DEPENDENCIES.md)
 
 ## What this crate is
 
@@ -90,10 +90,10 @@ There is **no** `cubecl` feature on this tree. Historical fused-kernel sources l
 
 ```toml
 [dependencies]
-peft-rs = "1.3.0"
+peft-rs = "1"
 
 # Optional: candle CUDA device support (not peft fused kernels)
-peft-rs = { version = "1.3.0", features = ["cuda"] }
+peft-rs = { version = "1", features = ["cuda"] }
 ```
 
 ## Installation
