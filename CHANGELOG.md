@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- `reopen-issues-closed-off-main.yml` is valid YAML again: replace the
+  column-0 `python3 <<'PY'` heredoc with `python3 -c` so GitHub stops
+  reporting a startup_failure on every push.
+
 ### Changed
 - `.gitignore` covers env/key files, `.cargo/config.toml`, and crate artifacts.
   `fleet-security.yml` gitleaks now requires `.gitleaks.toml` (`--config`).
