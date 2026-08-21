@@ -16,6 +16,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   not a frozen number in docs. Consumers pin `peft-rs = "1"`.
 
 ### Changed
+- CI pins match fleet `ap-workflows` `pins/actions.yml`: `actions/checkout@v7`
+  (`persist-credentials: false`), `astral-sh/setup-uv@v9`. `fleet-ci.yml` is a
+  thin caller of `reusable-ci-autodetect.yml@v0.1` with `all-features: false`
+  and `runs-on` label `rust` (fleet work image). Self-hosted security uses the
+  same image label; gitleaks docker/podman mounts are `:ro`.
+- Local `gitleaks protect --staged` via `.githooks/pre-commit`
+  (`scripts/install-hooks.sh`). Missing gitleaks fails the commit. CI gitleaks
+  is defense-in-depth; a secret that reached git history must be rotated.
+
+### Fixed
+- Prefix-tuning crate docs use [`PrefixTuningLayer::get_prefix_keys`] (and
+  values / `concat_to_kv`) so `cargo doc -D warnings` resolves the links.
 - Local `scripts/quality-check.sh` / `pre-commit.sh` run `--features unsloth`
   (and `unsloth,cuda` only if `nvcc` is on PATH). No `--all-features`.
   Docs gate uses `RUSTDOCFLAGS=-D warnings` and the cargo exit code (not
