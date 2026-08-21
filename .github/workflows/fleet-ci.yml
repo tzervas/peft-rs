@@ -51,12 +51,16 @@ jobs:
     runs-on: [self-hosted, linux, x64, podman]
     steps:
       - uses: actions/checkout@v4
+      # Work image ships rustc 1.88; this crate's MSRV is 1.96.
+      - uses: dtolnay/rust-toolchain@1.96.1
+      - name: rustc (MSRV 1.96)
+        run: rustc --version && cargo --version
       - name: free memory snapshot
         run: free -h || true
       - name: cargo check
         run: cargo check --workspace --all-targets
       - name: cargo test
-        run: cargo test --lib --tests
+        run: cargo test --workspace
 
   python:
     name: python lint/test

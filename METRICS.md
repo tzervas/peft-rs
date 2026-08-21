@@ -1,8 +1,9 @@
 # peft-rs Metrics
 
-**Status:** Correctness fixtures green (PR-042); **CPU LoRA wall-time baselines** from criterion (`--quick`) recorded for 1.1.0.  
+**Status:** Correctness fixtures green (PR-042); **CPU LoRA wall-time baselines** from criterion (`--quick`) recorded for 1.1.0; re-run not yet done on Candle 0.11.
 **Purpose:** Showcase-bar tracking for honesty releases.  
 **Product class:** Candle PEFT **adapter layer library** + Linear inject path (not a drop-in HF PEFT framework).
+
 
 ---
 
@@ -10,7 +11,8 @@
 
 | Side | Stack |
 |------|--------|
-| **This crate** | `peft-rs` **1.1.0** on Candle 0.9 (CPU default; optional candle CUDA) |
+| **This crate** | `peft-rs` **1.2.0** on Candle **0.11** (CPU default; optional candle CUDA) |
+
 | **Baseline** | HuggingFace [`peft`](https://github.com/huggingface/peft) LoRA linear math on PyTorch (optional offline verify) |
 
 Fair comparisons must use the **same adapter math surface** (e.g. LoRA rank/alpha, same shapes).
