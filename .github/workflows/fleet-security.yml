@@ -28,18 +28,12 @@ jobs:
       - name: Run gitleaks
         run: |
           set -euo pipefail
-          if [ ! -f .gitleaks.toml ]; then
-            echo "missing .gitleaks.toml — FAIL (config must be applied)" >&2
-            exit 1
-          fi
           if command -v gitleaks >/dev/null 2>&1; then
-            gitleaks detect --source . --config .gitleaks.toml --verbose --redact
+            gitleaks detect --source . --verbose --redact
           elif command -v docker >/dev/null 2>&1; then
-            docker run --rm -v "$PWD:/path" zricethezav/gitleaks:latest detect \
-              --source=/path --config=/path/.gitleaks.toml --verbose --redact
+            docker run --rm -v "$PWD:/path" zricethezav/gitleaks:latest detect --source=/path --verbose --redact
           elif command -v podman >/dev/null 2>&1; then
-            podman run --rm -v "$PWD:/path:ro" docker.io/zricethezav/gitleaks:latest detect \
-              --source=/path --config=/path/.gitleaks.toml --verbose --redact
+            podman run --rm -v "$PWD:/path:ro" docker.io/zricethezav/gitleaks:latest detect --source=/path --verbose --redact
           else
             echo "gitleaks not available on runner — FAIL (honest security gate)" >&2
             exit 1

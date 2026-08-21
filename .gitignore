@@ -1,46 +1,11 @@
-# Build
 /target/
+Cargo.lock
 **/*.rs.bk
 *.pdb
-
-# Secrets / local credentials (never commit)
-.env
-.env.*
-!.env.example
-*.pem
-*.key
-id_rsa
-id_rsa.pub
-credentials.json
-hf_token
-.hf_token
-.huggingface/
-
-# Local cargo path overrides / package droppings
-.cargo/config.toml
-*.crate
-Cargo.toml.orig
-
-# Library crate: lockfile is not the source of truth
-Cargo.lock
-
-# Coverage / profiling
-coverage/
-lcov.info
-*.profraw
-tarpaulin-report.html
-
-# Python helpers
-__pycache__/
-*.pyc
-.venv/
-.direnv/
-
-# OS / editor
 .DS_Store
 *.swp
 *.swo
-*~
+
+# IDE
 .vscode/
 .idea/
-*.code-workspace

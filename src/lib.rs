@@ -85,10 +85,9 @@ pub use adapters::prompt_tuning::{PromptInit, PromptTuningConfig, PromptTuningLa
 pub use adapters::vera::{VeraConfig, VeraLayer};
 pub use error::{PeftError, Result};
 pub use hf::{
-    extract_lora_ab, hf_peft_module_path, hf_state_dict_to_native, insert_module_lora_weights,
-    load_pretrained_hf, native_state_dict_to_hf, pack_lora_state_dict,
-    save_multi_module_pretrained_hf, save_pretrained_hf, slice_module_state_dict, HfLoraConfig,
-    LoraKeyStyle, DEFAULT_ADAPTER_NAME, HF_PEFT_WRAPPER_PREFIX, PEFT_TYPE_LORA,
+    extract_lora_ab, hf_state_dict_to_native, insert_module_lora_weights, load_pretrained_hf,
+    native_state_dict_to_hf, pack_lora_state_dict, save_pretrained_hf, slice_module_state_dict,
+    HfLoraConfig, LoraKeyStyle, DEFAULT_ADAPTER_NAME, PEFT_TYPE_LORA,
 };
 pub use io::{
     load_adapter_config, load_adapter_weights, load_pretrained, save_adapter_config,
