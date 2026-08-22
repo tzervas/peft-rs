@@ -8,7 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- `NOTICE` (Candle Apache-2.0; HF PEFT is inspiration, not vendored).
+- `NOTICE` (Candle MIT OR Apache-2.0, elect MIT; safetensors/tokenizers
+  Apache-2.0; HF PEFT is Apache-2.0 inspiration, not vendored).
 - `deny.toml` license allow-list (permissive only) and hosted
   `cargo deny licenses` in `fleet-security.yml`.
 - Hosted CI job `Unsloth feature`: `cargo test --features unsloth`.
