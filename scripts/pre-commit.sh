@@ -14,14 +14,9 @@ if ! cargo fmt -- --check; then
 fi
 echo "✅ Code formatting passed"
 
-FEATURES_ARG=""
-if command -v nvcc &> /dev/null; then
-    FEATURES_ARG="--all-features"
-fi
-
 # 2. Clippy check
 echo "2. Running clippy..."
-if ! cargo clippy --all-targets $FEATURES_ARG -- -D warnings; then
+if ! cargo clippy --all-targets --all-features -- -D warnings; then
     echo "❌ Clippy check failed. Fix warnings before committing."
     exit 1
 fi
@@ -29,7 +24,7 @@ echo "✅ Clippy passed"
 
 # 3. Test suite
 echo "3. Running test suite..."
-if ! cargo test $FEATURES_ARG; then
+if ! cargo test --all-features; then
     echo "❌ Tests failed. Fix failing tests before committing."
     exit 1
 fi
