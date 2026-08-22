@@ -322,4 +322,4 @@ cargo test --tests
 
 ## License
 
-MIT Licensed — see [LICENSE](LICENSE).
+MIT Licensed — see [LICENSE](LICENSE). Third-party crates and inspirations: [NOTICE](NOTICE).

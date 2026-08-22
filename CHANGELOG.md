@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `NOTICE` (Candle Apache-2.0; HF PEFT is inspiration, not vendored).
+- `deny.toml` license allow-list (permissive only) and hosted
+  `cargo deny licenses` in `fleet-security.yml`.
 - Hosted CI job `Unsloth feature`: `cargo test --features unsloth`.
   `RmsNorm` re-export has a CPU shape test when that feature is on.
   `should_dispatch_unsloth_lora()` stays false.
