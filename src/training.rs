@@ -5,7 +5,8 @@
 //! - Training state management (step / epoch / grad-accum counters)
 //! - Parameter counting helpers
 //! - A **minimal real train step** on [`crate::model::PeftLinearModel`]
-//!   (forward → loss → `AdamW` backward step) for the Linear+LoRA inject path
+//!   (forward → loss → optional global L2 grad clip → `AdamW` step) for the
+//!   Linear+LoRA inject path
 //!
 //! # Scope honesty
 //!
@@ -17,10 +18,11 @@
 // Allow usize to f64 casts for learning rate calculations - this is standard in ML code
 #![allow(clippy::cast_precision_loss)]
 
-use candle_core::Tensor;
+use candle_core::backprop::GradStore;
+use candle_core::{DType, Tensor, Var};
 use candle_nn::{AdamW, Optimizer};
 
-use crate::error::Result;
+use crate::error::{PeftError, Result};
 use crate::model::PeftLinearModel;
 
 /// Learning rate schedule strategies.
@@ -108,7 +110,10 @@ pub struct AdapterTrainingConfig {
     pub weight_decay: f64,
     /// Gradient accumulation steps
     pub gradient_accumulation_steps: usize,
-    /// Maximum gradient norm for clipping (None = no clipping)
+    /// Maximum global L2 gradient norm for clipping (`None` = no clipping).
+    ///
+    /// Applied in [`train_step_mse`] / [`train_step_with_loss`] when `Some(n)`.
+    /// Candle `AdamW` has no built-in clip; trainable grads are scaled honestly.
     pub max_grad_norm: Option<f64>,
 }
 
@@ -242,13 +247,78 @@ pub struct TrainStepResult {
     pub global_step: usize,
 }
 
+/// Clip trainable parameter gradients in-place so their global L2 norm is at
+/// most `max_norm`.
+///
+/// Candle's [`AdamW`] has no clip API. Returns the **unclipped** global L2
+/// (0.0 when none of `params` have grads). No-op when the unclipped norm is
+/// already `<= max_norm`.
+///
+/// # Errors
+/// Returns [`PeftError::InvalidConfig`] if `max_norm` is not finite and `> 0`.
+pub fn clip_grad_norm(params: &[&Tensor], grads: &mut GradStore, max_norm: f64) -> Result<f64> {
+    if !max_norm.is_finite() || max_norm <= 0.0 {
+        return Err(PeftError::InvalidConfig(
+            "max_grad_norm must be finite and > 0".into(),
+        ));
+    }
+
+    let mut total_sq = 0.0f64;
+    let mut found: Vec<(&Tensor, Tensor)> = Vec::new();
+    for param in params {
+        if let Some(g) = grads.get(param) {
+            let sq = g
+                .sqr()?
+                .sum_all()?
+                .to_dtype(DType::F64)?
+                .to_scalar::<f64>()?;
+            total_sq += sq;
+            found.push((*param, g.clone()));
+        }
+    }
+    let total_norm = total_sq.sqrt();
+    if total_norm > max_norm {
+        let scale = max_norm / (total_norm + 1e-6);
+        for (param, g) in found {
+            let clipped = (g * scale)?;
+            grads.insert(param, clipped);
+        }
+    }
+    Ok(total_norm)
+}
+
+fn adapter_param_refs(model: &PeftLinearModel) -> Vec<&Tensor> {
+    let mut refs = Vec::new();
+    for module in model.iter() {
+        let (a, b) = module.lora().weights();
+        refs.push(a);
+        refs.push(b);
+    }
+    refs
+}
+
+fn backward_clip_step(
+    opt: &mut AdamW,
+    state: &AdapterTrainingState,
+    loss_for_step: &Tensor,
+    params: &[&Tensor],
+) -> Result<()> {
+    let mut grads = loss_for_step.backward()?;
+    if let Some(max_norm) = state.max_grad_norm() {
+        clip_grad_norm(params, &mut grads, max_norm)?;
+    }
+    opt.step(&grads)?;
+    Ok(())
+}
+
 /// Run one MSE train step on a [`PeftLinearModel`].
 ///
 /// Pipeline:
 /// 1. Apply scheduled LR to the optimizer
 /// 2. `y = model.forward(input)`
 /// 3. `loss = mean((y - target)^2)`
-/// 4. If grad-accum window is full: `opt.backward_step(&loss)` and advance global step
+/// 4. If grad-accum window is full: optional [`clip_grad_norm`] on adapter
+///    weights, then `opt.step`, then advance global step
 ///
 /// # Arguments
 /// * `model` — Linear+LoRA stack (adapter Vars must be owned by `opt`)
@@ -299,7 +369,8 @@ pub fn train_step_mse(
         } else {
             loss
         };
-        opt.backward_step(&loss_for_step)?;
+        let params = adapter_param_refs(model);
+        backward_clip_step(opt, state, &loss_for_step, &params)?;
     } else {
         // Still materialize grads for accumulation semantics when scale > 1.
         // candle AdamW does not expose partial-accum; for micro-batches that
@@ -319,19 +390,32 @@ pub fn train_step_mse(
 /// Run one train step with a caller-supplied loss tensor already computed.
 ///
 /// Useful when the loss is not plain MSE (e.g. cross-entropy on logits).
-/// Applies scheduled LR, optionally steps the optimizer via grad-accum state,
-/// and returns a [`TrainStepResult`].
+/// Applies scheduled LR, optionally clips trainable grads when
+/// [`AdapterTrainingConfig::max_grad_norm`] is `Some`, steps the optimizer
+/// via grad-accum state, and returns a [`TrainStepResult`].
+///
+/// `params` must be the same adapter `Var`s owned by `opt`. Required (fail
+/// closed) when `max_grad_norm` is `Some`; may be empty when clipping is off.
 ///
 /// # Errors
-/// Propagates optimizer / scalar conversion errors.
+/// Propagates optimizer / scalar conversion errors, or
+/// [`PeftError::InvalidConfig`] if clipping is requested with no params.
 pub fn train_step_with_loss(
     opt: &mut AdamW,
     state: &mut AdapterTrainingState,
     loss: &Tensor,
+    params: &[Var],
 ) -> Result<TrainStepResult> {
     let lr = state.current_lr();
     opt.set_learning_rate(lr);
     let loss_val = loss.to_scalar::<f32>()?;
+
+    let param_refs: Vec<&Tensor> = params.iter().map(Var::as_tensor).collect();
+    if state.max_grad_norm().is_some() && param_refs.is_empty() {
+        return Err(PeftError::InvalidConfig(
+            "max_grad_norm is set but no trainable params were provided for clipping".into(),
+        ));
+    }
 
     let should_step = state.accumulated_steps + 1 >= state.gradient_accumulation_steps();
     if should_step {
@@ -341,7 +425,7 @@ pub fn train_step_with_loss(
         } else {
             loss.clone()
         };
-        opt.backward_step(&loss_for_step)?;
+        backward_clip_step(opt, state, &loss_for_step, &param_refs)?;
     }
 
     let did = state.step();
@@ -386,11 +470,11 @@ pub fn format_parameter_count(count: usize) -> String {
 }
 
 #[cfg(test)]
-#[allow(clippy::similar_names)]
+#[allow(clippy::similar_names, clippy::items_after_statements)]
 mod tests {
     use super::*;
     use crate::{get_peft_model, LoraConfig};
-    use candle_core::{DType, Device, Tensor};
+    use candle_core::{DType, Device, Tensor, Var};
     use candle_nn::{linear_no_bias, AdamW, Linear, ParamsAdamW, VarBuilder, VarMap};
 
     #[test]
@@ -670,6 +754,130 @@ mod tests {
         let r3 = train_step_mse(&model, &mut opt, &mut state, &x, &target)?;
         assert!(r3.did_optimizer_step);
         assert_eq!(r3.global_step, 1);
+        Ok(())
+    }
+
+    #[test]
+    fn test_clip_grad_norm_caps_global_l2() -> Result<()> {
+        let device = Device::Cpu;
+        // y = ||v||^2 with v = [3, 4]; dy/dv = [6, 8], unclipped L2 = 10
+        let v = Var::from_slice(&[3.0f32, 4.0], 2, &device)?;
+        let y = v.as_tensor().sqr()?.sum_all()?;
+        let mut grads = y.backward()?;
+        let unclipped = clip_grad_norm(&[v.as_tensor()], &mut grads, 5.0)?;
+        assert!((unclipped - 10.0).abs() < 1e-4, "unclipped L2={unclipped}");
+        let g = grads.get(v.as_tensor()).expect("grad for v");
+        let clipped_sq = g.sqr()?.sum_all()?.to_scalar::<f32>()?;
+        let clipped_norm = clipped_sq.sqrt();
+        assert!(
+            (clipped_norm - 5.0).abs() < 1e-3,
+            "clipped L2={clipped_norm}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_clip_grad_norm_rejects_non_positive() {
+        let mut grads = GradStore::default();
+        assert!(clip_grad_norm(&[], &mut grads, 0.0).is_err());
+        assert!(clip_grad_norm(&[], &mut grads, f64::NAN).is_err());
+    }
+
+    fn tiny_inject_model(
+        device: &Device,
+    ) -> Result<(crate::model::PeftLinearModel, VarMap, AdamW)> {
+        let host_vm = VarMap::new();
+        let host_vb = VarBuilder::from_varmap(&host_vm, DType::F32, device);
+        let h0 = linear_no_bias(8, 8, host_vb.pp("fc1"))?;
+        let base_modules = vec![(
+            "mlp.fc1".to_string(),
+            Linear::new(h0.weight().copy()?, None),
+        )];
+        let adapter_vm = VarMap::new();
+        let adapter_vb = VarBuilder::from_varmap(&adapter_vm, DType::F32, device);
+        let model = get_peft_model(
+            base_modules,
+            "mlp.*",
+            LoraConfig {
+                r: 4,
+                alpha: 8,
+                dropout: 0.0,
+                ..Default::default()
+            },
+            "default",
+            adapter_vb,
+        )?;
+        let opt = AdamW::new(
+            adapter_vm.all_vars(),
+            ParamsAdamW {
+                lr: 1e-2,
+                weight_decay: 0.0,
+                ..Default::default()
+            },
+        )?;
+        Ok((model, adapter_vm, opt))
+    }
+
+    fn adapter_l1(model: &crate::model::PeftLinearModel) -> Result<f32> {
+        let mut t = 0.0;
+        for m in model.iter() {
+            let (a, b) = m.lora().weights();
+            t += a.abs()?.sum_all()?.to_scalar::<f32>()?;
+            t += b.abs()?.sum_all()?.to_scalar::<f32>()?;
+        }
+        Ok(t)
+    }
+
+    #[test]
+    fn test_train_step_mse_clips_when_max_grad_norm_set() -> Result<()> {
+        let device = Device::Cpu;
+        let (model, _vm, mut opt) = tiny_inject_model(&device)?;
+        let mut state = AdapterTrainingState::new(AdapterTrainingConfig {
+            learning_rate: 1e-2,
+            max_grad_norm: Some(1e-12),
+            ..Default::default()
+        });
+        let before = adapter_l1(&model)?;
+        let x = Tensor::randn(0f32, 1f32, (4, 8), &device)?;
+        let target = Tensor::zeros(x.shape(), DType::F32, &device)?;
+        let result = train_step_mse(&model, &mut opt, &mut state, &x, &target)?;
+        assert!(result.did_optimizer_step);
+        let after = adapter_l1(&model)?;
+        assert!(
+            (after - before).abs() < 1e-4,
+            "tiny max_grad_norm must cap the update (before={before}, after={after})"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_train_step_with_loss_clips_and_requires_params() -> Result<()> {
+        let device = Device::Cpu;
+        let (model, adapter_vm, mut opt) = tiny_inject_model(&device)?;
+        let mut state = AdapterTrainingState::new(AdapterTrainingConfig {
+            learning_rate: 1e-2,
+            max_grad_norm: Some(1.0),
+            ..Default::default()
+        });
+        let x = Tensor::randn(0f32, 1f32, (4, 8), &device)?;
+        let target = Tensor::zeros(x.shape(), DType::F32, &device)?;
+        let y = model.forward(&x)?;
+        let loss = y.sub(&target)?.sqr()?.mean_all()?;
+
+        let err = train_step_with_loss(&mut opt, &mut state, &loss, &[]).unwrap_err();
+        assert!(
+            err.to_string().contains("max_grad_norm"),
+            "empty params must fail-closed when clipping, got {err}"
+        );
+
+        let before = adapter_l1(&model)?;
+        let result = train_step_with_loss(&mut opt, &mut state, &loss, &adapter_vm.all_vars())?;
+        assert!(result.did_optimizer_step);
+        let after = adapter_l1(&model)?;
+        assert!(
+            (after - before).abs() > 1e-6,
+            "train_step_with_loss must update adapters when params are provided"
+        );
         Ok(())
     }
 }

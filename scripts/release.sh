@@ -52,11 +52,23 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo "Step 1: Running quality checks"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-echo -n "Running tests... "
-if cargo test --all-features --quiet; then
+echo -n "Running tests (--lib)... "
+if cargo test --lib --quiet; then
     echo -e "${GREEN}✅${NC}"
 else
-    echo -e "${RED}❌ Tests failed${NC}"
+    echo -e "${RED}❌ Tests failed (--lib)${NC}"
+    exit 1
+fi
+
+TEST_FEATURES=(--features unsloth)
+if command -v nvcc >/dev/null 2>&1; then
+    TEST_FEATURES=(--features unsloth,cuda)
+fi
+echo -n "Running tests (${TEST_FEATURES[*]})... "
+if cargo test "${TEST_FEATURES[@]}" --quiet; then
+    echo -e "${GREEN}✅${NC}"
+else
+    echo -e "${RED}❌ Tests failed (${TEST_FEATURES[*]})${NC}"
     exit 1
 fi
 

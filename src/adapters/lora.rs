@@ -1011,6 +1011,48 @@ mod tests {
     }
 
     #[test]
+    fn test_freeze_skips_dropout_and_does_not_detach_vars() {
+        let device = Device::Cpu;
+        let vm = VarMap::new();
+        let vb = VarBuilder::from_varmap(&vm, DType::F32, &device);
+        let config = LoraConfig {
+            r: 4,
+            alpha: 8,
+            dropout: 0.5,
+            ..Default::default()
+        };
+        let mut layer = LoraLayer::new(8, 8, config, vb).unwrap();
+        for v in vm.all_vars() {
+            let ones = Tensor::ones(v.shape(), v.dtype(), v.device()).unwrap();
+            v.set(&ones).unwrap();
+        }
+
+        let input = Tensor::ones((1, 4, 8), DType::F32, &device).unwrap();
+        layer.freeze();
+        assert!(layer.is_frozen());
+        let y1 = layer.forward(&input, None).unwrap();
+        let y2 = layer.forward(&input, None).unwrap();
+        let d = (y1.clone() - y2)
+            .unwrap()
+            .abs()
+            .unwrap()
+            .sum_all()
+            .unwrap()
+            .to_scalar::<f32>()
+            .unwrap();
+        assert!(d < 1e-5, "freeze() must skip dropout (delta={d})");
+
+        // freeze() is a layer flag only — Vars stay on the autograd graph.
+        let loss = y1.sum_all().unwrap();
+        let grads = loss.backward().unwrap();
+        let (a, b) = layer.weights();
+        assert!(
+            grads.get(a).is_some() && grads.get(b).is_some(),
+            "freeze() must not detach Candle Vars"
+        );
+    }
+
+    #[test]
     fn test_dora_save_load_weights() -> Result<()> {
         use crate::io::{load_adapter_weights, save_adapter_weights};
         use tempfile::TempDir;

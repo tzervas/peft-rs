@@ -78,8 +78,10 @@ pub struct HfLoraConfig {
     #[serde(default)]
     pub lora_dropout: f64,
 
-    /// Bias handling (`"none"`, `"all"`, `"lora_only"`). peft-rs treats as
-    /// documentation only for now (Linear `LoRA` is bias-free).
+    /// Bias handling. Only `"none"` is supported (Linear `LoRA` is bias-free).
+    ///
+    /// Load/validate returns [`PeftError::InvalidConfig`] for any other value
+    /// (`"all"`, `"lora_only"`, …). This crate does not train or save LoRA bias.
     #[serde(default = "default_bias")]
     pub bias: String,
 
@@ -183,8 +185,8 @@ impl HfLoraConfig {
     /// Validate core fields.
     ///
     /// # Errors
-    /// Returns [`PeftError::InvalidConfig`] when rank/alpha are zero or
-    /// `peft_type` is not `LoRA`.
+    /// Returns [`PeftError::InvalidConfig`] when rank/alpha are zero,
+    /// `peft_type` is not `LoRA`, or `bias` is not `"none"`.
     pub fn validate(&self) -> Result<()> {
         if self.peft_type.to_uppercase() != PEFT_TYPE_LORA {
             return Err(PeftError::InvalidConfig(format!(
@@ -202,6 +204,12 @@ impl HfLoraConfig {
             return Err(PeftError::InvalidConfig(
                 "lora_dropout must be in [0.0, 1.0)".into(),
             ));
+        }
+        if self.bias != "none" {
+            return Err(PeftError::InvalidConfig(format!(
+                "unsupported bias '{}'; only \"none\" is supported (Linear LoRA is bias-free)",
+                self.bias
+            )));
         }
         Ok(())
     }
@@ -804,6 +812,49 @@ mod tests {
         assert!(sd.contains_key("lora_a.weight"));
         let sum_a = sd["lora_a.weight"].sum_all()?.to_scalar::<f32>()?;
         assert!((sum_a - 32.0).abs() < 1e-4); // 4*8 ones
+        Ok(())
+    }
+
+    #[test]
+    fn test_hf_bias_must_be_none() {
+        let mut cfg = HfLoraConfig::default();
+        assert!(cfg.validate().is_ok());
+        cfg.bias = "all".into();
+        let err = cfg.validate().unwrap_err().to_string();
+        assert!(err.contains("bias"), "err={err}");
+        cfg.bias = "lora_only".into();
+        assert!(cfg.validate().is_err());
+        cfg.bias = "none".into();
+        assert!(cfg.validate().is_ok());
+    }
+
+    #[test]
+    fn test_hf_load_rejects_non_none_bias() -> Result<()> {
+        use crate::io::{load_adapter_config, save_adapter_config};
+
+        let device = Device::Cpu;
+        let lora_cfg = LoraConfig {
+            r: 4,
+            alpha: 8,
+            ..Default::default()
+        };
+        let layer = LoraLayer::new_with_zeros(8, 8, lora_cfg.clone(), &device)?;
+        let hf_cfg = HfLoraConfig::from_lora_config(&lora_cfg, None, None);
+        let temp = TempDir::new().map_err(|e| PeftError::Io(e.to_string()))?;
+        save_pretrained_hf(&layer, &hf_cfg, temp.path(), &LoraKeyStyle::hf_default())?;
+
+        let cfg_path = temp.path().join(ADAPTER_CONFIG_FILENAME);
+        let mut on_disk: HfLoraConfig = load_adapter_config(&cfg_path)?;
+        on_disk.bias = "all".into();
+        save_adapter_config(&on_disk, &cfg_path)?;
+
+        let mut loaded = LoraLayer::new_with_zeros(8, 8, lora_cfg, &device)?;
+        let err = load_pretrained_hf(&mut loaded, temp.path(), &device, None).unwrap_err();
+        let msg = err.to_string();
+        assert!(
+            msg.contains("bias"),
+            "load must fail-closed on bias, got {msg}"
+        );
         Ok(())
     }
 }

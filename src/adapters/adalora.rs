@@ -17,6 +17,7 @@
 use std::collections::HashMap;
 
 use candle_core::{DType, Device, Tensor};
+use candle_nn::ops::dropout as candle_dropout;
 use candle_nn::VarMap;
 use serde::{Deserialize, Serialize};
 
@@ -36,7 +37,10 @@ pub struct AdaLoraConfig {
     /// Scaling factor (typically alpha / r).
     pub alpha: usize,
 
-    /// Dropout probability applied to outputs.
+    /// Dropout probability applied to the AdaLoRA residual during training.
+    ///
+    /// Applied in [`AdaLoraLayer::forward`] when the layer is **unfrozen** and
+    /// `dropout > 0`. Skipped when frozen (inference). Must be in `[0.0, 1.0)`.
     #[serde(default)]
     pub dropout: f64,
 
@@ -123,9 +127,9 @@ impl AdapterConfig for AdaLoraConfig {
         if self.alpha == 0 {
             return Err(PeftError::InvalidConfig("alpha must be > 0".into()));
         }
-        if !(0.0..=1.0).contains(&self.dropout) {
+        if !(0.0..1.0).contains(&self.dropout) {
             return Err(PeftError::InvalidConfig(
-                "dropout must be between 0 and 1".into(),
+                "dropout must be in [0.0, 1.0)".into(),
             ));
         }
         if self.total_step == 0 {
@@ -446,6 +450,13 @@ impl Adapter for AdaLoraLayer {
         // Reshape back to [batch, seq, out_features]
         let out = out.reshape((input_dims[0], input_dims[1], self.out_features))?;
 
+        // Training dropout on the residual path (skipped when frozen / p == 0).
+        let out = if !self.frozen && self.config.dropout > 0.0 {
+            candle_dropout(&out, self.config.dropout as f32)?
+        } else {
+            out
+        };
+
         // Apply scaling
         let scaling = Tensor::new(self.scaling as f32, out.device())?;
         let out = out.broadcast_mul(&scaling)?;
@@ -514,10 +525,14 @@ impl Trainable for AdaLoraLayer {
         Ok(())
     }
 
+    /// Sets the layer frozen flag (skips dropout in forward).
+    ///
+    /// Does **not** detach underlying Candle `Var`s from the autograd graph.
     fn freeze(&mut self) {
         self.frozen = true;
     }
 
+    /// Clears the frozen flag (re-enables training dropout when configured).
     fn unfreeze(&mut self) {
         self.frozen = false;
     }
@@ -727,5 +742,63 @@ mod tests {
         assert_eq!(layer.current_rank(), 8);
         layer.update_rank_from_schedule(19).unwrap(); // final → budget 2
         assert_eq!(layer.current_rank(), 2);
+    }
+
+    #[test]
+    fn test_adalora_dropout_unfrozen_changes_output_vs_frozen() {
+        let config = AdaLoraConfig {
+            dropout: 0.5,
+            init_r: 4,
+            target_r: 4,
+            total_step: 10,
+            tinit: 0,
+            tfinal: 0,
+            ..Default::default()
+        };
+        let device = Device::Cpu;
+        let mut layer = AdaLoraLayer::new(16, 16, config, &device).unwrap();
+        let input = Tensor::ones(&[1, 8, 16], DType::F32, &device).unwrap();
+
+        let unfrozen = layer.forward(&input, None).unwrap();
+        layer.freeze();
+        assert!(layer.is_frozen());
+        let frozen1 = layer.forward(&input, None).unwrap();
+        let frozen2 = layer.forward(&input, None).unwrap();
+
+        let freeze_delta = (frozen1.clone() - frozen2)
+            .unwrap()
+            .abs()
+            .unwrap()
+            .sum_all()
+            .unwrap()
+            .to_scalar::<f32>()
+            .unwrap();
+        assert!(
+            freeze_delta < 1e-5,
+            "freeze() must skip dropout (delta={freeze_delta})"
+        );
+
+        // inverted-dropout scale 1/(1-p) makes unfrozen differ whenever residual ≠ 0
+        let train_delta = (unfrozen - frozen1)
+            .unwrap()
+            .abs()
+            .unwrap()
+            .sum_all()
+            .unwrap()
+            .to_scalar::<f32>()
+            .unwrap();
+        assert!(
+            train_delta > 1e-5,
+            "dropout>0 unfrozen must change output vs frozen (delta={train_delta})"
+        );
+    }
+
+    #[test]
+    fn test_adalora_dropout_one_is_invalid() {
+        let config = AdaLoraConfig {
+            dropout: 1.0,
+            ..Default::default()
+        };
+        assert!(config.validate().is_err());
     }
 }

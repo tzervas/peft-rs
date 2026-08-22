@@ -1,6 +1,6 @@
 # PEFT-RS Gap Analysis
 
-Comparison between Rust **peft-rs 1.2.0** and HuggingFace Python PEFT.
+Comparison between Rust **peft-rs 1.3.x** and HuggingFace Python PEFT.
 
 > **Honesty note (2026-08-20):** peft-rs is a **Candle adapter layer library** with a
 > Linear inject path and LoRA HF *key mapping* — **not** a full PEFT framework.
@@ -9,7 +9,7 @@ Comparison between Rust **peft-rs 1.2.0** and HuggingFace Python PEFT.
 
 ## Product class
 
-| Claim | Truth (1.2.0) |
+| Claim | Truth (1.3.x) |
 |-------|----------------|
 | Drop-in HF PEFT | **No** |
 | Candle adapter layers | **Yes** (varying depth) |
@@ -29,7 +29,7 @@ Comparison between Rust **peft-rs 1.2.0** and HuggingFace Python PEFT.
 | AdaLoRA | **partial** | SVD + top-k mask + schedule; no full HF suite |
 | IA³ / LoHa / LoKr / OFT / BOFT / VeRA | **partial** | Layer math only |
 | Prefix / Prompt | **experimental** | Helpers; not full HF prefix-tuning stack |
-| p-tuning / X-LoRA / FourierFT / … | **missing** | Out of 1.2.0 |
+| p-tuning / X-LoRA / FourierFT / … | **missing** | Out of 1.3.x |
 
 ## Infrastructure
 

@@ -12,7 +12,8 @@ trainer loop in this crate).
 | Horizon | Criteria | Status |
 |---------|----------|--------|
 | **1.0.4 honesty train** | Docs match code; flags honesty; METRICS scaffold | **Met** |
-| **1.1.0 HF + inject + parity + train/multi/quant** | HF config/keys, Linear inject, LoRA goldens, train step, weighted multi-adapter, quant bridge | **Met** (this release) |
+| **1.1.0 HF + inject + parity + train/multi/quant** | HF config/keys, Linear inject, LoRA goldens, train step, weighted multi-adapter, quant bridge | **Met** |
+| **1.3.x honesty hygiene** | Fail-closed flags; applied dropout; no `--all-features`; no compiled `inference.rs` | **This PR** |
 | **Mid** | freeze/grad truth on Var path; wall-time METRICS | **Not met** |
 | **Later** | Optional fused CUDA kernels; broader tuner surface | **Not met** / kernels quarantined |
 
