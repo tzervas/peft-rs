@@ -105,8 +105,8 @@ pub use quant::{
 };
 pub use registry::{AdapterRegistry, AdapterWeight};
 pub use training::{
-    count_trainable_parameters, format_parameter_count, train_step_mse, train_step_with_loss,
-    AdapterTrainingConfig, AdapterTrainingState, LrSchedule, TrainStepResult,
+    clip_grad_norm, count_trainable_parameters, format_parameter_count, train_step_mse,
+    train_step_with_loss, AdapterTrainingConfig, AdapterTrainingState, LrSchedule, TrainStepResult,
 };
 pub use traits::{Adapter, AdapterConfig, Mergeable, Trainable};
 pub use unsloth_hook::{should_dispatch_unsloth_lora, unsloth_feature_enabled};

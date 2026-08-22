@@ -14,7 +14,7 @@ Semver, commitizen, and where a version actually shipped:
 
 ### Code Quality
 - [ ] All clippy warnings resolved (`cargo clippy -- -D warnings`)
-- [ ] All tests passing (`cargo test --all-features`)
+- [ ] All tests passing (`cargo test --lib` then `cargo test --features unsloth`; add `,cuda` only if `nvcc` is on PATH). Do **not** `--all-features` (pulls `cuda`).
 - [ ] Code formatted (`cargo fmt --check`)
 - [ ] No security vulnerabilities (`cargo audit`)
 - [ ] Documentation complete (`cargo doc --no-deps`)

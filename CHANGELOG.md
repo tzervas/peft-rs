@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Honesty hygiene (PR-P0):
+  - Delete orphan `src/inference.rs` (never `mod`'d; CLAUDE.md forbids compiled `inference.rs`).
+  - `scripts/release.sh` / `docs/RELEASE_PROCESS.md`: `cargo test --lib` then
+    `cargo test --features unsloth` (`unsloth,cuda` only if `nvcc` is on PATH).
+    Do **not** `--all-features` (pulls `cuda`).
+  - AdaLoRA applies `candle_nn::ops::dropout` when unfrozen and `dropout > 0`
+    (the field was validated but unused in forward).
+  - BOFT `boft_dropout != 0` is `InvalidConfig` (no fake multiplicative dropout).
+  - `HfLoraConfig::bias` load/validate requires `"none"`.
+  - `max_grad_norm` is applied in `train_step_mse` / `train_step_with_loss`
+    (global L2 clip of trainable grads). Candle `AdamW` has no clip API.
+    `train_step_with_loss` takes adapter `Var`s and fail-closes if clipping is
+    on with an empty param list.
+  - `freeze()` skips dropout; tests assert it is a layer flag, not Candle `Var`
+    detach.
+
+### Changed
+- Drop unused workspace `proptest` dev-dependency.
+- Docs titles (`TASK_TRACKER`, `GAP_ANALYSIS`, `roadmap`, `METRICS`) say
+  **1.3.x**. METRICS CPU numbers remain 1.1.0 criterion (not re-run on 1.3).
+
 ### Added
 - `NOTICE` (Candle MIT OR Apache-2.0, elect MIT; safetensors/tokenizers
   Apache-2.0; HF PEFT is Apache-2.0 inspiration, not vendored).

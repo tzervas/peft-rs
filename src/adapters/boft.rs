@@ -39,9 +39,10 @@ pub struct BoftConfig {
     #[serde(default = "default_boft_n_butterfly_factor")]
     pub boft_n_butterfly_factor: usize,
 
-    /// Dropout probability for multiplicative dropout (0.0 = no dropout).
-    /// Note: Dropout is currently not implemented in forward pass.
-    /// This parameter is reserved for future implementation.
+    /// Multiplicative BOFT dropout. **Must be 0.0.**
+    ///
+    /// Non-zero values fail validation. This crate does not implement BOFT
+    /// multiplicative dropout and will not silently ignore or fake the flag.
     #[serde(default)]
     pub boft_dropout: f64,
 
@@ -84,6 +85,7 @@ impl Default for BoftConfig {
 }
 
 impl AdapterConfig for BoftConfig {
+    #[allow(clippy::float_cmp)]
     fn validate(&self) -> Result<()> {
         if self.boft_block_size == 0 && self.boft_block_num == 0 {
             return Err(PeftError::InvalidConfig(
@@ -103,9 +105,9 @@ impl AdapterConfig for BoftConfig {
         if self.eps <= 0.0 {
             return Err(PeftError::InvalidConfig("eps must be > 0".into()));
         }
-        if !(0.0..=1.0).contains(&self.boft_dropout) {
+        if self.boft_dropout != 0.0 {
             return Err(PeftError::InvalidConfig(
-                "boft_dropout must be in [0.0, 1.0]".into(),
+                "boft_dropout must be 0.0; multiplicative BOFT dropout is not implemented".into(),
             ));
         }
         Ok(())
@@ -692,6 +694,23 @@ mod tests {
         config.boft_block_num = 4;
         config.boft_n_butterfly_factor = 0;
         assert!(config.validate().is_err());
+
+        // Fail-closed: non-zero multiplicative dropout is not implemented
+        config.boft_n_butterfly_factor = 1;
+        config.boft_dropout = 0.1;
+        assert!(config.validate().is_err());
+        config.boft_dropout = 0.0;
+        assert!(config.validate().is_ok());
+    }
+
+    #[test]
+    fn test_boft_dropout_nonzero_rejected_at_new() {
+        let device = Device::Cpu;
+        let config = BoftConfig {
+            boft_dropout: 0.1,
+            ..Default::default()
+        };
+        assert!(BoftLayer::new(64, 64, config, &device).is_err());
     }
 
     #[test]
